@@ -6,16 +6,18 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   ShieldCheck,
-  FolderOpen,
-  CreditCard,
-  Users,
-  Settings,
-  Droplet,
-  BarChart3,
   LogOut,
   Bell,
-  MessageCircle,
-  FileText
+  FlaskConical,
+  Building2,
+  Package,
+  ClipboardList,
+  ShoppingCart,
+  Users,
+  Euro,
+  BarChart3,
+  Settings,
+  HelpCircle
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -51,15 +53,17 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   const items = [
     { icon: LayoutDashboard, label: t('overview'), href: "/admin" },
-    { icon: Bell, label: t('notifications'), href: "/admin/notifications", badge: unreadCount },
-    { icon: ShieldCheck, label: t('verifications'), href: "/admin/verifications" },
-    { icon: FolderOpen, label: t('recommendations'), href: "/admin/recommendations" },
-    { icon: CreditCard, label: t('financial'), href: "/admin/financial" },
-    { icon: BarChart3, label: t('insights'), href: "/admin/insights" },
+    { icon: FlaskConical, label: "Test Catalog", href: "/admin/catalog" },
+    { icon: Building2, label: "Laboratories", href: "/admin/laboratories" },
+    { icon: Package, label: "Materials", href: "/admin/materials" },
+    { icon: ClipboardList, label: "Recommendations", href: "/admin/recommendations" },
+    { icon: ShoppingCart, label: "Orders", href: "/admin/orders" },
     { icon: Users, label: t('users'), href: "/admin/users" },
-    { icon: MessageCircle, label: "FAQ", href: "/admin/faq" },
-    { icon: FileText, label: "Templates", href: "/admin/templates" },
+    { icon: Euro, label: t('financial'), href: "/admin/financial" },
+    { icon: BarChart3, label: t('insights'), href: "/admin/insights" },
     { icon: Settings, label: t('configuration'), href: "/admin/config" },
+    { icon: Bell, label: t('notifications'), href: "/admin/notifications", badge: unreadCount },
+    { icon: HelpCircle, label: "FAQ", href: "/admin/faq" },
   ];
 
   return (
