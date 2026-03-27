@@ -1,217 +1,240 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
-import { UserSquare, Plus, Search, Calendar, Phone, Mail } from "lucide-react";
+"use client";
+
+import { useState, useEffect } from "react";
+import { Plus, Search, MoreHorizontal, User, Calendar, MapPin, Mail, ShieldCheck } from "lucide-react";
+import { PatientModal } from "@/components/dashboard/PatientModal";
 import Link from "next/link";
-import { format } from "date-fns";
-import { redirect } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { useRouter } from "next/navigation";
 
-export const dynamic = "force-dynamic";
+export default function PatientsListPage() {
+  const router = useRouter();
+  const [patients, setPatients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPatient, setEditingPatient] = useState<any>(null);
 
-export default async function PatientsIndexPage() {
-  const t = await getTranslations('hc.patients');
-  const supabase = createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Debounce search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Fetch all recommendations for this Doctor, joining patient data
-  // Since multiple HCs might share a patient record but only see their own recommendations,
-  // we use supabaseAdmin to strictly read the joined patient data bypassing strict RLS,
-  // while tightly confining the query to the valid user's Doctor ID.
-  const { createClient } = await import("@supabase/supabase-js");
-  const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  const { data: casesList } = await supabaseAdmin
-    .from("recommendation")
-    .select(`
-      id, created_at,
-      patient:patient_id (
-        id, first_name, last_name, date_of_birth, contact_email, phone
-      )
-    `)
-    .eq("doctor_id", user.id)
-    .order("created_at", { ascending: false });
-
-  console.log("--- PATIENT DIRECTORY DEBUG ---");
-  console.log("USER ID:", user.id);
-  console.log("CASES LIST RETURNED:", JSON.stringify(casesList, null, 2));
-  console.log("-------------------------------");
-
-  const validCases = casesList || [];
-
-  // Group by Patient to get unique patients, recommendation count, and most recent recommendation date
-  const patientMap = new Map();
-
-  validCases.forEach(c => {
-    const p = c.patient as any;
-    if (!p) return;
-
-    if (!patientMap.has(p.id)) {
-      patientMap.set(p.id, {
-        id: p.id,
-        name: `${p.first_name} ${p.last_name}`,
-        dob: p.date_of_birth,
-        email: p.contact_email,
-        phone: p.phone,
-        casesCount: 1,
-        lastCaseDate: c.created_at
-      });
-    } else {
-      const existing = patientMap.get(p.id);
-      existing.casesCount += 1;
-      // Since recommendations are ordered by created_at DESC, the first one encountered is the newest
+  // Fetch logic
+  const loadPatients = async () => {
+    setLoading(true);
+    try {
+      const url = debouncedSearch 
+        ? `/api/doctor/patients?search=${encodeURIComponent(debouncedSearch)}`
+        : `/api/doctor/patients`;
+      
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch patients");
+      const data = await res.json();
+      setPatients(data.patients || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-  });
+  };
 
-  const uniquePatients = Array.from(patientMap.values());
+  useEffect(() => {
+    loadPatients();
+  }, [debouncedSearch]);
+
+  const handleOpenModal = (patient: any = null) => {
+    setEditingPatient(patient);
+    setIsModalOpen(true);
+  };
+
+  const handleModalSuccess = () => {
+    loadPatients();
+  };
+
+  const formatInsurance = (val: string) => {
+    if (!val) return "Unknown";
+    const map: Record<string, string> = {
+      'gesetzlich': 'Gesetzlich',
+      'privat_versichert': 'Privat (PKV)',
+      'selbstzahler': 'Selbstzahler'
+    };
+    return map[val] || val;
+  };
 
   return (
-    <div className="flex-1 min-w-0 w-full">
+    <div className="flex-1 min-w-0 w-full animate-in fade-in duration-300">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight">
-            {t('index.title')}
-          </h1>
-          <p className="text-[13px] sm:text-[15px] text-gray-500 mt-1">
-            {t('index.subtitle')}
-          </p>
+      <div className="mb-6 border-b border-gray-100 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight mb-1">
+              Patients
+            </h1>
+            <p className="text-[13px] sm:text-[14px] text-gray-500 m-0">
+              Manage your assigned patients and registry.
+            </p>
+          </div>
+          <button 
+            onClick={() => handleOpenModal()}
+            className="w-full sm:w-auto bg-primary hover:bg-primary-dark text-white rounded-full px-5 py-2.5 text-[13px] font-semibold flex items-center justify-center gap-2 shrink-0 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Register Patient
+          </button>
         </div>
-        <Link 
-          href="/dashboard/recommendations/new"
-          className="w-full sm:w-auto bg-primary text-white rounded-full px-5 py-2.5 text-[13px] font-semibold hover:bg-primary-dark transition-colors flex items-center justify-center gap-2 shrink-0"
-        >
-          <Plus className="w-[18px] h-[18px]" strokeWidth={2.5} />
-          {t('index.newCaseButton')}
-        </Link>
       </div>
 
-      {/* Table Container */}
-      <div className="bg-white rounded-[16px] border border-gray-200 overflow-hidden shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6 border-b border-gray-200">
-          <h2 className="font-heading text-lg font-medium m-0 text-near-black flex items-center gap-2">
-            <UserSquare className="w-5 h-5 text-gray-500" />
-            {t('index.allPatients')}
-          </h2>
-          {/* We could add a search input here if needed to filter client side */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
-              placeholder={t('index.searchPlaceholder')} 
-              className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] outline-none focus:border-ruby-400 focus:bg-white transition-colors w-64"
-            />
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between mt-2 mb-6 gap-4">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input 
+            type="text" 
+            placeholder="Search patients by name or email..." 
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full h-10 pl-9 pr-4 text-[13px] rounded-full border border-gray-200 focus:border-primary outline-none bg-white transition-colors"
+          />
+        </div>
+        <div className="w-full sm:w-auto text-[13px] font-medium text-gray-500 bg-white px-4 py-2 rounded-full border border-gray-200">
+          {patients.length} {patients.length === 1 ? 'patient' : 'patients'}
+        </div>
+      </div>
+
+      {/* Table Area */}
+      {loading ? (
+        <div className="flex items-center justify-center p-20">
+          <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        </div>
+      ) : patients.length === 0 ? (
+        <div className="bg-white rounded-[20px] border border-gray-200 p-12 text-center flex flex-col items-center">
+          <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+            <User className="w-8 h-8 text-gray-300" />
+          </div>
+          <h3 className="text-lg font-medium text-near-black mb-1">No patients found</h3>
+          <p className="text-[14px] text-gray-500 mb-6 max-w-sm">
+            {searchQuery 
+              ? "We couldn't find any patients matching your search query." 
+              : "Your patient registry is currently empty. Register your first patient to begin sending recommendations."}
+          </p>
+          <button onClick={() => handleOpenModal()} className="px-5 py-2.5 rounded-full bg-primary text-white font-semibold text-[13px] hover:bg-primary-dark transition-colors">
+            Register New Patient
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-[20px] border border-gray-200 overflow-hidden shadow-sm">
+          {/* Default Table Desktop */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/50">
+                  <th className="px-5 py-3.5 text-[12px] font-semibold text-gray-500 uppercase tracking-widest bg-gray-50/50">Name</th>
+                  <th className="px-5 py-3.5 text-[12px] font-semibold text-gray-500 uppercase tracking-widest bg-gray-50/50">DOB</th>
+                  <th className="px-5 py-3.5 text-[12px] font-semibold text-gray-500 uppercase tracking-widest bg-gray-50/50">Gender</th>
+                  <th className="px-5 py-3.5 text-[12px] font-semibold text-gray-500 uppercase tracking-widest bg-gray-50/50">Insurance</th>
+                  <th className="px-5 py-3.5 text-[12px] font-semibold text-gray-500 uppercase tracking-widest bg-gray-50/50">Recs</th>
+                  <th className="px-5 py-3.5 text-[12px] font-semibold text-gray-500 uppercase tracking-widest bg-gray-50/50 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {patients.map((p, i) => (
+                  <tr 
+                    key={p.id} 
+                    onClick={() => router.push(`/dashboard/patients/${p.id}`)}
+                    className={`group cursor-pointer hover:bg-gray-50/50 transition-colors ${i < patients.length - 1 ? 'border-b border-gray-100' : ''}`}
+                  >
+                    <td className="px-5 py-4">
+                      <div className="font-semibold text-[14px] text-near-black tracking-tight">{p.last_name}, {p.first_name}</div>
+                      <div className="text-[12px] text-gray-500 truncate max-w-[200px] mt-0.5">{p.email || '—'}</div>
+                    </td>
+                    <td className="px-5 py-4 font-body text-[13px] text-gray-600">
+                      {new Date(p.date_of_birth).toLocaleDateString()}
+                    </td>
+                    <td className="px-5 py-4 font-body text-[13px] text-gray-600">
+                      {p.gender === 'M' ? 'Male' : p.gender === 'W' ? 'Female' : 'Diverse'}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold tracking-wide bg-blue-50 text-blue-700 border border-blue-100/50">
+                        {formatInsurance(p.insured_status)}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 font-body text-[13px] font-semibold text-gray-600">
+                      {p.recommendation_count}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleOpenModal(p); }} 
+                        className="p-1.5 text-gray-400 hover:text-near-black hover:bg-gray-100 rounded-lg transition-colors inline-flex"
+                      >
+                        <MoreHorizontal className="w-5 h-5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards rendering */}
+          <div className="md:hidden flex flex-col">
+            {patients.map((p, i) => (
+              <div 
+                key={p.id}
+                onClick={() => router.push(`/dashboard/patients/${p.id}`)}
+                className={`p-4 active:bg-gray-50 transition-colors ${i < patients.length - 1 ? 'border-b border-gray-100' : ''}`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="font-semibold text-[15px] text-near-black tracking-tight">
+                    {p.last_name}, {p.first_name}
+                  </div>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-100/50">
+                    {formatInsurance(p.insured_status)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3 text-[12px] text-gray-500 mb-2">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {new Date(p.date_of_birth).toLocaleDateString()} ({p.gender})
+                  </div>
+                </div>
+
+                {p.email && (
+                  <div className="flex items-center gap-1.5 text-[12px] text-gray-500 mb-2">
+                    <Mail className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{p.email}</span>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100/60">
+                  <div className="text-[12px] font-medium text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                    {p.recommendation_count} {p.recommendation_count === 1 ? 'Recommendation' : 'Recommendations'}
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleOpenModal(p); }} 
+                    className="p-1.5 text-gray-400 hover:text-near-black bg-gray-50 hover:bg-gray-100 rounded-[8px] transition-colors"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
+      )}
 
-        <div className="responsive-table-wrapper">
-          <table className="w-full min-w-[800px] border-collapse">
-            <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-200">
-                <th className="px-6 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">{t('index.table.name')}</th>
-                <th className="px-6 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">{t('index.table.contact')}</th>
-                <th className="px-6 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">{t('index.table.dob')}</th>
-                <th className="px-6 py-3.5 text-center text-[11px] font-bold text-gray-500 uppercase tracking-wider">{t('index.table.totalCases')}</th>
-                <th className="px-6 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider">{t('index.table.latestCase')}</th>
-                <th className="px-6 py-3.5 text-right text-[11px] font-bold text-gray-500 uppercase tracking-wider">{t('index.table.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {uniquePatients.map((p, i) => (
-                <tr key={p.id} className={`group hover:bg-gray-50 transition-colors ${i < uniquePatients.length - 1 ? 'border-b border-gray-200' : ''}`}>
-                  <td className="px-6 py-4">
-                    <div className="font-semibold text-[14px] text-near-black">{p.name}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                        <Mail className="w-3.5 h-3.5" />
-                        {p.email}
-                      </div>
-                      {p.phone && (
-                        <div className="flex items-center gap-1.5 text-[13px] text-gray-500">
-                          <Phone className="w-3.5 h-3.5" />
-                          {p.phone}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5 text-[13px] text-near-black">
-                      <Calendar className="w-3.5 h-3.5 text-gray-500" />
-                      {p.dob ? format(new Date(p.dob), 'MMM d, yyyy') : '—'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <div className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-near-black font-bold text-[13px]">
-                      {p.casesCount}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-[13px] text-gray-500">
-                    {format(new Date(p.lastCaseDate), 'MMM d, yyyy')}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <Link 
-                      href={`/dashboard/patients/${p.id}`}
-                      className="text-[13px] font-semibold text-primary hover:text-primary-dark hover:bg-open-bg px-4 py-2 rounded-full transition-colors"
-                    >
-                      {t('index.table.viewPatient')}
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-              
-              {uniquePatients.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-500">
-                      <UserSquare className="w-10 h-10 mb-3 text-gray-300" />
-                      <p className="text-[14px] font-medium">{t('index.empty.title')}</p>
-                      <p className="text-[13px] mt-1">{t('index.empty.description')}</p>
-                      <Link 
-                        href="/dashboard/recommendations/new"
-                        className="mt-4 px-6 py-2.5 rounded-full bg-primary text-white font-semibold text-[13px] hover:bg-primary-dark shadow-none transition-colors"
-                      >
-                        {t('index.empty.createButton')}
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile card view */}
-        <div className="mobile-card-list">
-          {uniquePatients.map((p: any) => (
-            <div
-              key={p.id}
-              className="border-b border-gray-100 p-4 cursor-pointer active:bg-gray-50 last:border-0"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <div className="text-[14px] font-medium text-near-black">
-                    {p.name}
-                  </div>
-                  <div className="text-[12px] text-gray-400 mt-0.5">{p.email}</div>
-                </div>
-                <div className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-near-black font-bold text-[13px]">
-                  {p.casesCount}
-                </div>
-              </div>
-              <div className="flex items-center gap-4 mt-2 text-[12px] text-gray-500">
-                <Link href={`/dashboard/patients/${p.id}`} className="text-primary-dark font-semibold">{t('index.table.viewPatient')}</Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Shared Edit Modal via React Portal */}
+      <PatientModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        patient={editingPatient} 
+        onSuccess={handleModalSuccess} 
+      />
     </div>
   );
 }

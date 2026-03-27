@@ -5,42 +5,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  FolderOpen,
+  ClipboardList,
   Receipt,
   Users,
-  UserSquare,
+  FlaskConical,
   Settings,
-  Droplet,
+  UserPlus,
   LogOut,
   Bell
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useNotifications } from "@/hooks/useNotifications";
-import { useTranslations } from 'next-intl';
+import { useDoctor } from "@/components/providers/DoctorProvider";
 
 export function DoctorSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { doctor } = useDoctor();
   const [hover, setHover] = useState<number | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [userProfile, setUserProfile] = useState<{ name: string, email: string } | null>(null);
   const { unreadCount } = useNotifications();
-  const t = useTranslations('hc.sidebar');
-
-  useEffect(() => {
-    async function loadProfile() {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      
-      const { data } = await supabase.from('doctor_practice').select('name, contact_email').eq('id', session.user.id).single();
-      if (data) {
-        setUserProfile({ name: data.name, email: data.contact_email });
-      }
-    }
-    loadProfile();
-  }, []);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -50,13 +35,14 @@ export function DoctorSidebar({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   const items = [
-    { icon: LayoutDashboard, label: t('dashboard'), href: "/dashboard" },
-    { icon: FolderOpen, label: t('recommendations'), href: "/dashboard/recommendations" },
-    { icon: UserSquare, label: t('patients'), href: "/dashboard/patients" },
-    { icon: Receipt, label: t('billing'), href: "/dashboard/billing" },
-    { icon: Users, label: t('team'), href: "/dashboard/team" },
-    { icon: Settings, label: t('settings'), href: "/dashboard/settings" },
-    { icon: Bell, label: t('notifications'), href: "/dashboard/notifications", badge: unreadCount },
+    { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+    { icon: ClipboardList, label: "Recommendations", href: "/dashboard/recommendations" },
+    { icon: Users, label: "Patients", href: "/dashboard/patients" },
+    { icon: FlaskConical, label: "Test Catalog", href: "/dashboard/catalog" },
+    { icon: Receipt, label: "Billing", href: "/dashboard/billing" },
+    { icon: UserPlus, label: "Team", href: "/dashboard/team" },
+    { icon: Settings, label: "Settings", href: "/dashboard/settings" },
+    { icon: Bell, label: "Notifications", href: "/dashboard/notifications", badge: unreadCount },
   ];
 
   return (
@@ -114,12 +100,16 @@ export function DoctorSidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex items-center gap-3 px-4 py-2.5 mb-2">
           <div className="w-9 h-9 rounded-full bg-steel-50 flex items-center justify-center shrink-0">
             <span className="font-heading text-[14px] font-medium text-steel-600">
-              {userProfile?.name ? userProfile.name.substring(0, 2).toUpperCase() : "Doctor"}
+              {doctor?.full_name ? doctor.full_name.substring(0, 2).toUpperCase() : "DR"}
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-[14px] font-medium text-near-black truncate">{userProfile?.name || t('loading')}</div>
-            <div className="text-[13px] text-gray-500 truncate">{t('doctorPractice')}</div>
+            <div className="text-[14px] font-medium text-near-black truncate">
+              {doctor?.full_name || "Loading..."}
+            </div>
+            <div className="text-[13px] text-gray-500 truncate">
+              {doctor?.practice_name || ""}
+            </div>
           </div>
         </div>
         <button
@@ -128,7 +118,7 @@ export function DoctorSidebar({ onNavigate }: { onNavigate?: () => void }) {
           className="w-full text-gray-500 hover:text-near-black hover:bg-gray-50 flex items-center justify-center gap-2 py-2 rounded-full text-[13px] font-semibold transition-colors disabled:opacity-50"
         >
           <LogOut className="w-4 h-4" />
-          {isLoggingOut ? t('signingOut') : t('signOut')}
+          {isLoggingOut ? "Signing Out..." : "Sign Out"}
         </button>
       </div>
     </aside>

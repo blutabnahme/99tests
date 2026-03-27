@@ -7,178 +7,178 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { createClient } from "@/lib/supabase";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { COUNTRIES, PHONE_PREFIXES } from "@/lib/countries";
+import { SPECIALTIES } from "@/lib/specialties";
+import { PhoneInput } from "@/components/ui/PhoneInput";
 import {
   Building2,
   FileText,
   User,
-  ShieldCheck,
   CheckSquare,
-  UploadCloud,
   ArrowRight,
   ArrowLeft,
   Eye,
-  EyeOff
+  EyeOff,
+  Upload,
+  X,
+  Loader2
 } from "lucide-react";
 import { useTranslations } from 'next-intl';
 
-const getSteps = (t: any) => [
-  { icon: Building2, label: t("auth.hc.steps.info") },
-  { icon: FileText, label: t("auth.hc.steps.document") },
-  { icon: User, label: t("auth.hc.steps.contact") },
-  { icon: ShieldCheck, label: t("auth.hc.steps.avv") },
-  { icon: CheckSquare, label: t("auth.hc.steps.review") },
+const steps = [
+  { icon: User, label: "Account Setup" },
+  { icon: Building2, label: "Practice Information" },
+  { icon: FileText, label: "Contact Details" }
 ];
 
-export default function HCRegistrationPage() {
+export default function DoctorRegistrationPage() {
   const router = useRouter();
   const supabase = createClient();
   const t = useTranslations();
 
   const [step, setStep] = useState(0);
 
-  // Step 1: Company Info
-  const [companyName, setCompanyName] = useState("");
-  const [companyType, setCompanyType] = useState("practice");
-  const [street, setStreet] = useState("");
-  const [city, setCity] = useState("");
-  const [zip, setZip] = useState("");
-  const [taxId, setTaxId] = useState("");
-
-  // Step 2: Document Upload
-  const [file, setFile] = useState<File | null>(null);
-
-  // Step 3: Contact Person Details
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-
-  // Auth Context (Collected in Step 1)
+  // Step 1: Account
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Step 4: AVV Signature
-  const [agreedToAVV, setAgreedToAVV] = useState(false);
+  // Step 2: Practice Info
+  const [fullName, setFullName] = useState("");
+  const [practiceName, setPracticeName] = useState("");
+  const [specialty, setSpecialty] = useState("");
+  const [licenseNumber, setLicenseNumber] = useState("");
 
-  // Loading/Error state
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docUrl, setDocUrl] = useState<string | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  // Step 3: Contact
+  const [phonePrefix, setPhonePrefix] = useState("+49");
+  const [phoneSystem, setPhoneSystem] = useState("");
+  
+  const [street, setStreet] = useState("");
+  const [zip, setZip] = useState("");
+  const [city, setCity] = useState("");
+  const [country, setCountry] = useState("DE"); // Default to DE (Deutschland)
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const next = () => setStep(Math.min(step + 1, getSteps(t).length - 1));
+  const next = () => {
+    if (step === 0 && password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setError(null);
+    setStep(Math.min(step + 1, steps.length - 1));
+  };
+  
   const prev = () => setStep(Math.max(step - 1, 0));
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File size must be strictly less than 5MB");
+      return;
+    }
+
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      setError("Invalid file type. Only PDF, JPG, and PNG are allowed.");
+      return;
+    }
+
+    setUploadingDoc(true);
+    setError(null);
+    setDocFile(file);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      // 'doctorId' will just use Date.now() on the server if missing, perfect for pre-auth uploads
+      
+      const res = await fetch('/api/upload/document', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to upload document");
+
+      setDocUrl(data.url);
+    } catch (err: any) {
+      setError(err.message);
+      setDocFile(null);
+      setDocUrl(null);
+    } finally {
+      setUploadingDoc(false);
     }
   };
 
+  const removeDocument = () => {
+    setDocFile(null);
+    setDocUrl(null);
+    const fileInput = document.getElementById('verification-doc') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+  };
+
   const handleSubmit = async () => {
-    // E2E Test Bypass: Relax AVV verification matching
-    /*
-    if (!agreedToAVV) {
-      setError("You must accept the Data Processing Agreement to continue.");
-      return;
-    }
-    */
-    // E2E Test Bypass: Accept missing files for automated runs
-    // if (!file) {
-    //   setError("Please go back and upload your business license or registration document.");
-    //   return;
-    // }
     if (password !== confirmPassword) {
-      setError("Passwords do not match. Please go back to step 1 and verify.");
+      setError("Passwords do not match.");
       return;
     }
 
     setLoading(true);
     setError(null);
 
+    const completePhone = `${phonePrefix}${phoneSystem.replace(/^0+/, '')}`;
+
     try {
-      // E2E Test Bypass: Ensure uniquely synthesized emails pass Supabase ratelimiting constraints
-      const safeEmail = email;
-      // 1. Create the user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: safeEmail,
-        password,
-        options: {
-          data: {
-            role: "doctor_practice",
-            full_name: `${firstName} ${lastName}`,
-          },
-        },
-      });
-
-      if (authError || !authData.user) {
-        throw new Error(authError?.message || "Failed to create user account.");
-      }
-
-      const userId = authData.user.id;
-
-      // 2. Upload verification document to Supabase Storage (if provided)
-      let filePath = "system/mock_document.pdf"; // Fallback for E2E tests
-      let publicUrl = "https://mock.example.com";
-      
-      if (file) {
-        const fileExt = file.name.split(".").pop();
-        filePath = `${userId}/${Date.now()}_business_license.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("verification_documents")
-          .upload(filePath, file);
-
-        if (uploadError) {
-          throw new Error("Failed to upload verification document: " + uploadError.message);
-        }
-
-        const { data: urlData } = supabase.storage
-          .from("verification_documents")
-          .getPublicUrl(filePath);
-        publicUrl = urlData?.publicUrl || publicUrl;
-      }
-
-      // 3 & 4. Use Proxy API to insert records (bypasses RLS delays for new users)
-      const res = await fetch('/api/register/hc', {
+      // 1. Hit the server proxy API directly to forge user via supabaseAdmin
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId,
           email,
-          companyName,
-          companyType,
-          phone,
+          password,
+          fullName,
+          practiceName,
+          specialty,
+          licenseNumber,
+          phone: completePhone,
           street,
-          city,
           zip,
-          taxId,
-          fileUrl: filePath // Only used if file was actually uploaded
+          city,
+          country,
+          verificationDocumentUrl: docUrl
         })
       });
+
+      const data = await res.json();
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || "Failed to complete registration");
+        throw new Error(data.error || "Failed to complete registration");
       }
 
-      // 5. Notify Admins
-      await fetch('/api/internal/webhook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'notify_admins',
-          payload: {
-            type: 'system_alert',
-            title: 'New Healthcare Company Registration',
-            message: `${companyName} has joined the platform. Verification required before they can post recommendations.`,
-            link: `/admin/users`
-          }
-        })
+      // 2. We now sign in the user via the client to populate their local session
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
 
-      // 6. Navigate to success screen
-      router.push("/register/doctor/success");
+      if (signInError) {
+        router.push("/login?success=Account created, please log in.");
+        return;
+      }
+
+      // 3. Navigate to dashboard securely
+      router.push("/dashboard");
 
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.");
@@ -193,11 +193,11 @@ export default function HCRegistrationPage() {
         return (
           <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200">
             <div>
-              <h2 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight mb-1">{t("auth.hc.infoTitle")}</h2>
-              <p className="text-[13px] sm:text-[15px] text-gray-500 mt-1 mb-6">{t("auth.hc.infoSub")}</p>
+              <h2 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight mb-1">Account Setup</h2>
+              <p className="text-[13px] sm:text-[15px] text-gray-500 mt-1 mb-6">Create your 99Tests Doctor Profile securely.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-200 pb-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-gray-200">
               <div className="col-span-1 md:col-span-2 space-y-1.5">
                 <Label required>{t('auth.email')}</Label>
                 <Input
@@ -246,65 +246,12 @@ export default function HCRegistrationPage() {
                 </div>
               </div>
             </div>
-
-            <div className="space-y-1.5">
-              <Label required>{t('auth.companyName')}</Label>
-              <Input
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="e.g. Dr. Schmidt Medical Practice"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label required>{t("auth.hc.companyType")}</Label>
-              <select
-                className="w-full px-4 py-2.5 rounded-[10px] border border-gray-200 text-[14px] text-near-black outline-none bg-white focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer"
-                value={companyType}
-                onChange={(e) => setCompanyType(e.target.value)}
-              >
-                <option value="practice">{t("auth.hc.typePractice")}</option>
-                <option value="lab">{t("auth.hc.typeLab")}</option>
-                <option value="telemedicine">{t("auth.hc.typeTelemedicine")}</option>
-                <option value="startup">{t("auth.hc.typeStartup")}</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="col-span-1 sm:col-span-2 space-y-1.5">
-                <Label required>{t("auth.hc.street")}</Label>
-                <Input
-                  value={street}
-                  onChange={(e) => setStreet(e.target.value)}
-                  placeholder={t("auth.hc.streetPlaceholder")}
-                />
+            
+            {error && (
+              <div className="p-3 bg-red-50 text-red-600 text-[13px] rounded-lg border border-red-100 mt-4 leading-relaxed">
+                {error}
               </div>
-              <div className="space-y-1.5">
-                <Label required>{t("auth.hc.zip")}</Label>
-                <Input
-                  value={zip}
-                  onChange={(e) => setZip(e.target.value)}
-                  placeholder={t("auth.hc.zipPlaceholder")}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label required>{t("auth.hc.city")}</Label>
-                <Input
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder={t("auth.hc.cityPlaceholder")}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label required>{t("auth.hc.taxId")}</Label>
-              <Input
-                value={taxId}
-                onChange={(e) => setTaxId(e.target.value)}
-                placeholder={t("auth.hc.taxIdPlaceholder")}
-              />
-            </div>
+            )}
           </div>
         );
 
@@ -312,38 +259,95 @@ export default function HCRegistrationPage() {
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
-              <h2 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight mb-1">{t("auth.hc.docTitle")}</h2>
-              <p className="text-[13px] sm:text-[15px] text-gray-500 mt-1 mb-6">{t("auth.hc.docSub")}</p>
+              <h2 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight mb-1">Practice Information</h2>
+              <p className="text-[13px] sm:text-[15px] text-gray-500 mt-1 mb-6">Tell us about your practice.</p>
             </div>
 
-            <div className="pt-2">
-              <Label required>{t("auth.hc.docLabel")}</Label>
-              <label 
-                className="mt-2 flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-[14px] bg-gray-50 hover:bg-primary/5 hover:border-primary transition-all cursor-pointer group"
-              >
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  {file ? (
-                    <>
-                      <FileText className="w-10 h-10 text-primary mb-3" />
-                      <p className="mb-2 text-sm text-near-black font-semibold">{file.name}</p>
-                      <p className="text-xs text-gray-500">{t("auth.hc.docReplace")}</p>
-                    </>
-                  ) : (
-                    <>
-                      <UploadCloud className="w-10 h-10 text-gray-400 group-hover:text-primary transition-colors mb-3" />
-                      <p className="mb-2 text-sm text-gray-500">{t("auth.hc.docUpload")}</p>
-                      <p className="text-xs text-gray-500">{t("auth.hc.docFormat")}</p>
-                    </>
-                  )}
-                </div>
-                <input 
-                  type="file" 
-                  className="hidden" 
-                  accept=".pdf,image/jpeg,image/png"
-                  onChange={handleFileChange}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="col-span-1 sm:col-span-2 space-y-1.5">
+                <Label required>Full Name (Title & Name)</Label>
+                <Input
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Dr. med. Max Mustermann"
                 />
-              </label>
+              </div>
+              
+              <div className="col-span-1 sm:col-span-2 space-y-1.5">
+                <Label required>Practice Name</Label>
+                <Input
+                  value={practiceName}
+                  onChange={(e) => setPracticeName(e.target.value)}
+                  placeholder="e.g. Hausarztpraxis Mustermann"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Specialty</Label>
+                <SearchableSelect
+                  value={specialty}
+                  onChange={(val) => setSpecialty(val)}
+                  options={SPECIALTIES.map(s => ({ id: s.value, name: s.label }))}
+                  placeholder="Select specialty..."
+                  searchPlaceholder="Search specialty..."
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>License Number (Arztnummer)</Label>
+                <Input
+                  value={licenseNumber}
+                  onChange={(e) => setLicenseNumber(e.target.value)}
+                  placeholder="e.g. 123456789"
+                />
+              </div>
+
+              <div className="col-span-1 sm:col-span-2 border-t border-gray-100 pt-4 mt-2">
+                <Label>Verification Document</Label>
+                <p className="text-[12px] text-gray-500 mb-3 mt-0.5">Upload a verification document (e.g., Approbationsurkunde, Arztnummer-Nachweis). PDF, PNG, JPG up to 5MB.</p>
+                
+                {docFile ? (
+                  <div className="flex items-center justify-between p-3 border border-gray-200 rounded-[10px] bg-gray-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="min-w-0 pr-4">
+                        <div className="text-[13px] font-medium text-near-black truncate max-w-[200px]">{docFile.name}</div>
+                        <div className="text-[11px] text-gray-400">{(docFile.size / 1024 / 1024).toFixed(2)} MB</div>
+                      </div>
+                    </div>
+                    {uploadingDoc ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-gray-400 mr-2" />
+                    ) : (
+                      <button type="button" onClick={removeDocument} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all">
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="relative group">
+                    <input 
+                      type="file" 
+                      id="verification-doc"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={handleFileUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                    />
+                    <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-200 rounded-[12px] p-6 bg-gray-50/50 group-hover:bg-primary/5 group-hover:border-primary/50 transition-colors">
+                      <Upload className="w-6 h-6 text-gray-400 group-hover:text-primary mb-2 transition-colors" />
+                      <div className="text-[13px] font-medium text-near-black">Click to upload or drag and drop</div>
+                      <div className="text-[12px] text-gray-400 mt-1">PDF, JPG, PNG</div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+            
+            {error && (
+              <div className="p-3 bg-red-50 text-red-600 text-[13px] rounded-lg border border-red-100 mt-4 leading-relaxed">
+                {error}
+              </div>
+            )}
           </div>
         );
 
@@ -351,127 +355,57 @@ export default function HCRegistrationPage() {
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
-              <h2 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight mb-1">{t("auth.hc.contactTitle")}</h2>
-              <p className="text-[13px] sm:text-[15px] text-gray-500 mt-1 mb-6">{t("auth.hc.contactSub")}</p>
+              <h2 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight mb-1">Contact Details</h2>
+              <p className="text-[13px] sm:text-[15px] text-gray-500 mt-1 mb-6">Where is your primary practice located?</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label required>{t('auth.firstName')}</Label>
-                <Input
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder={t("auth.hc.firstNamePlaceholder")}
+              <div className="col-span-1 sm:col-span-2 space-y-1.5">
+                <Label>Phone</Label>
+                <PhoneInput
+                  prefix={phonePrefix}
+                  onPrefixChange={(val) => setPhonePrefix(val)}
+                  value={phoneSystem}
+                  onChange={(val) => setPhoneSystem(val)}
+                  placeholder="176 1234 5678"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label required>{t('auth.lastName')}</Label>
+
+              <div className="col-span-1 sm:col-span-2 space-y-1.5">
+                <Label>Street & House Number</Label>
                 <Input
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder={t("auth.hc.lastNamePlaceholder")}
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  placeholder="Musterstrasse 1"
                 />
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <Label required>{t('auth.phone')}</Label>
-              <Input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder={t("auth.hc.phonePlaceholder")}
-              />
-            </div>
-          </div>
-        );
-
-      case 3:
-        return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-            <div>
-              <h2 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight mb-1">{t("auth.hc.legalTitle")}</h2>
-              <p className="text-[13px] sm:text-[15px] text-gray-500 mt-1 mb-6">{t("auth.hc.legalSub")}</p>
-            </div>
-
-            <div className="p-5 border border-gray-200 rounded-[14px] bg-white">
-              <h3 className="font-medium text-near-black text-[15px] mb-3">{t("auth.hc.legalAvv")}</h3>
-              <div className="h-40 overflow-y-auto pr-4 text-[13px] text-gray-500 leading-relaxed border border-gray-200 rounded-lg p-3 bg-gray-50">
-                <p className="mb-3">
-                  <strong>Preamble</strong><br/>
-                  This Data Processing Agreement details the parties' obligations on the protection of personal data, associated with the processing of personal data on behalf of the Healthcare Company as the Data Controller by 99Tests as the Data Processor, in accordance with Article 28 of the GDPR.
-                </p>
-                <p className="mb-3">
-                  <strong>1. Subject matter and duration</strong><br/>
-                  The Processor shall process personal data on behalf of the Controller solely for the provision of the 99Tests platform and matching services. The processing includes patient names, contact details, diagnoses, and test requirements.
-                </p>
-                <p>
-                  <strong>2. Obligations of the Processor</strong><br/>
-                  The Processor implements appropriate technical and organizational measures to ensure the security of processing. The Processor will only use sub-processors located within the European Union that comply with strict data protection standards.
-                </p>
+              <div className="space-y-1.5">
+                <Label>ZIP</Label>
+                <Input
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value)}
+                  placeholder="10115"
+                />
+              </div>
+              
+              <div className="space-y-1.5">
+                <Label>City</Label>
+                <Input
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Berlin"
+                />
               </div>
 
-              <div className="mt-6 flex items-start gap-4 cursor-pointer" onClick={() => setAgreedToAVV(!agreedToAVV)}>
-                <div className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded border ${agreedToAVV ? 'bg-primary border-primary' : 'bg-white border-gray-300'} flex items-center justify-center transition-colors`}>
-                  {agreedToAVV && <CheckSquare className="w-4 h-4 text-white" />}
-                </div>
-                <div>
-                  <p className="text-[14px] font-semibold text-near-black">{t("auth.hc.signAvvText")}</p>
-                  <p className="text-[12px] text-gray-500 mt-1">
-                    {t("auth.hc.signAvvSub")}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-            <div>
-              <h2 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight mb-1">{t("auth.hc.reviewTitle")}</h2>
-              <p className="text-[13px] sm:text-[15px] text-gray-500 mt-1 mb-6">{t("auth.hc.reviewSub")}</p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="p-4 border border-gray-200 rounded-[14px] flex justify-between items-center bg-white shadow-sm">
-                <div className="flex gap-4 items-center">
-                  <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-primary-dark" />
-                  </div>
-                  <div>
-                    <h4 className="text-[14px] font-medium text-near-black">{t("auth.hc.reviewCompany")}</h4>
-                    <p className="text-[13px] text-gray-500">{companyName || "—"} ({companyType})</p>
-                  </div>
-                </div>
-                <button onClick={() => setStep(0)} className="text-[13px] text-gray-500 hover:text-primary-dark font-semibold px-3 py-1 rounded-full border border-gray-200 hover:border-primary-light hover:bg-open-bg transition-colors">{t("auth.btnEdit")}</button>
-              </div>
-
-              <div className="p-4 border border-gray-200 rounded-[14px] flex justify-between items-center bg-white shadow-sm">
-                <div className="flex gap-4 items-center">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-steel-500" />
-                  </div>
-                  <div>
-                    <h4 className="text-[14px] font-medium text-near-black">{t("auth.hc.reviewDoc")}</h4>
-                    <p className="text-[13px] text-gray-500">{file ? file.name : t("auth.hc.notUploaded")}</p>
-                  </div>
-                </div>
-                <button onClick={() => setStep(1)} className="text-[13px] text-gray-500 hover:text-primary-dark font-semibold px-3 py-1 rounded-full border border-gray-200 hover:border-primary-light hover:bg-open-bg transition-colors">{t("auth.btnEdit")}</button>
-              </div>
-
-              <div className="p-4 border border-gray-200 rounded-[14px] flex justify-between items-center bg-white shadow-sm">
-                <div className="flex gap-4 items-center">
-                  <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
-                    <User className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <h4 className="text-[14px] font-medium text-near-black">{t("auth.hc.reviewContact")}</h4>
-                    <p className="text-[13px] text-gray-500">{firstName} {lastName} • {email}</p>
-                  </div>
-                </div>
-                <button onClick={() => setStep(2)} className="text-[13px] text-gray-500 hover:text-primary-dark font-semibold px-3 py-1 rounded-full border border-gray-200 hover:border-primary-light hover:bg-open-bg transition-colors">{t("auth.btnEdit")}</button>
+              <div className="col-span-1 sm:col-span-2 space-y-1.5">
+                <Label>Country</Label>
+                <SearchableSelect
+                  value={country}
+                  onChange={(val) => setCountry(val)}
+                  options={COUNTRIES.map(c => ({ id: c.code, name: c.name, description: c.flag }))}
+                  placeholder="Select a country..."
+                />
               </div>
             </div>
 
@@ -505,14 +439,14 @@ export default function HCRegistrationPage() {
         {/* ════════ STEP INDICATOR SIDEBAR ════════ */}
         <div className="hidden md:block w-56 shrink-0 pt-4">
           <div className="sticky top-8 space-y-6">
-            {getSteps(t).map((s, i) => {
+            {steps.map((s, i) => {
               const Icon = s.icon;
               const isActive = i === step;
               const isPast = i < step;
 
               return (
                 <div key={i} className="flex flex-col relative">
-                  {i < getSteps(t).length - 1 && (
+                  {i < steps.length - 1 && (
                     <div className={`absolute top-8 left-[19px] bottom-[-24px] w-[2px] ${isPast ? "bg-primary" : "bg-gray-200"} transition-colors`} />
                   )}
                   <div 
@@ -564,28 +498,29 @@ export default function HCRegistrationPage() {
 
             {/* Mobile indicator text */}
             <div className="text-center text-[12px] text-gray-400 font-medium md:hidden">
-              Step {step + 1} of {getSteps(t).length}
+              Step {step + 1} of {steps.length}
             </div>
 
-            {step < getSteps(t).length - 1 ? (
+            {step < steps.length - 1 ? (
               <Button 
                 onClick={next} 
                 variant="primary" 
                 className="w-full sm:w-auto order-first sm:order-last px-6 py-2.5 rounded-full text-[14px] font-semibold flex items-center justify-center gap-2"
                 style={{ height: "44px" }}
+                disabled={uploadingDoc}
               >
                 {t("auth.btnContinue")} <ArrowRight className="w-4 h-4" />
               </Button>
             ) : (
               <Button 
                 onClick={handleSubmit} 
-                disabled={loading} 
+                disabled={loading || uploadingDoc} 
                 variant="primary" 
                 className="w-full sm:w-auto order-first sm:order-last px-6 py-2.5 rounded-full text-[14px] font-semibold flex items-center justify-center gap-2"
                 style={{ height: "44px" }}
               >
-                {loading ? "Submitting..." : (
-                  <>{t("auth.btnSubmitApplication")} <CheckSquare className="w-4 h-4 ml-1" /></>
+                {loading || uploadingDoc ? "Registering..." : (
+                  <>Complete Registration <CheckSquare className="w-4 h-4 ml-1" /></>
                 )}
               </Button>
             )}

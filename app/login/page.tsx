@@ -45,8 +45,10 @@ export default function LoginPage() {
           router.push('/admin');
         } else if (role === 'blood_collector') {
           router.push('/bc');
-        } else {
+        } else if (role === 'doctor' || role === 'doctor_practice') {
           router.push('/dashboard');
+        } else {
+          router.push('/dashboard'); // fallback
         }
         router.refresh();
       }
