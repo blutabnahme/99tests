@@ -1,0 +1,221 @@
+﻿app/admin/insights/page.tsx(740,1): error TS1005: ')' expected.
+app/admin/notifications/page.tsx(233,35): error TS1005: ',' expected.
+app/admin/notifications/page.tsx(234,19): error TS1005: ')' expected.
+app/admin/notifications/page.tsx(234,21): error TS17002: Expected corresponding JSX closing tag for 'button'.
+app/admin/notifications/page.tsx(235,18): error TS1005: ',' expected.
+app/admin/notifications/page.tsx(236,17): error TS17002: Expected corresponding JSX closing tag for 'div'.
+app/admin/notifications/page.tsx(237,15): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/admin/notifications/page.tsx(459,5): error TS1005: ')' expected.
+app/admin/notifications/page.tsx(460,3): error TS1109: Expression expected.
+app/admin/recommendations/[id]/page.tsx(443,28): error TS1003: Identifier expected.
+app/admin/recommendations/[id]/page.tsx(446,25): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+app/admin/recommendations/[id]/page.tsx(448,27): error TS17002: Expected corresponding JSX closing tag for 'div'.
+app/admin/recommendations/[id]/page.tsx(449,24): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/admin/recommendations/[id]/page.tsx(451,19): error TS1005: ')' expected.
+app/admin/recommendations/[id]/page.tsx(453,16): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/admin/recommendations/[id]/page.tsx(505,21): error TS1003: Identifier expected.
+app/admin/recommendations/[id]/page.tsx(508,18): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+app/admin/recommendations/[id]/page.tsx(512,20): error TS17002: Expected corresponding JSX closing tag for 'div'.
+app/admin/recommendations/[id]/page.tsx(517,10): error TS1005: ')' expected.
+app/admin/recommendations/[id]/page.tsx(537,7): error TS1128: Declaration or statement expected.
+app/admin/recommendations/[id]/page.tsx(540,12): error TS1005: ';' expected.
+app/admin/recommendations/[id]/page.tsx(541,10): error TS2657: JSX expressions must have one parent element.
+app/admin/recommendations/[id]/page.tsx(577,7): error TS1128: Declaration or statement expected.
+app/admin/recommendations/[id]/page.tsx(578,5): error TS1109: Expression expected.
+app/admin/recommendations/[id]/page.tsx(579,3): error TS1109: Expression expected.
+app/admin/recommendations/[id]/page.tsx(580,1): error TS1128: Declaration or statement expected.
+app/api/admin/insights/route.ts(47,7): error TS1128: Declaration or statement expected.
+app/api/admin/recommendations/[id]/route.ts(65,7): error TS1128: Declaration or statement expected.
+app/api/admin/recommendations/[id]/route.ts(266,14): error TS1005: ';' expected.
+app/api/admin/recommendations/[id]/route.ts(267,15): error TS1005: ';' expected.
+app/api/admin/recommendations/[id]/route.ts(268,8): error TS1128: Declaration or statement expected.
+app/api/admin/recommendations/[id]/route.ts(298,5): error TS1472: 'catch' or 'finally' expected.
+app/api/admin/recommendations/[id]/route.ts(357,5): error TS1005: 'try' expected.
+app/api/admin/recommendations/[id]/route.ts(361,1): error TS1128: Declaration or statement expected.
+app/api/admin/users/create/route.ts(73,19): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(74,18): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(75,22): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(76,14): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(77,22): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(78,15): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(79,21): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(80,23): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(81,17): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(82,26): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(83,31): error TS1005: ';' expected.
+app/api/admin/users/create/route.ts(84,8): error TS1472: 'catch' or 'finally' expected.
+app/api/admin/users/create/route.ts(127,3): error TS1128: Declaration or statement expected.
+app/api/admin/users/create/route.ts(127,5): error TS1005: 'try' expected.
+app/api/admin/users/create/route.ts(131,1): error TS1128: Declaration or statement expected.
+app/api/appointments/[id]/cancel/route.ts(24,5): error TS1472: 'catch' or 'finally' expected.
+app/api/appointments/[id]/cancel/route.ts(225,5): error TS1005: 'try' expected.
+app/api/appointments/[id]/cancel/route.ts(229,1): error TS1128: Declaration or statement expected.
+app/api/doctor/applications/[id]/status/route.ts(99,9): error TS1128: Declaration or statement expected.
+app/api/doctor/applications/[id]/status/route.ts(108,18): error TS1005: ';' expected.
+app/api/doctor/applications/[id]/status/route.ts(109,19): error TS1005: ';' expected.
+app/api/doctor/applications/[id]/status/route.ts(110,17): error TS1005: ';' expected.
+app/api/doctor/applications/[id]/status/route.ts(111,18): error TS1005: ';' expected.
+app/api/doctor/applications/[id]/status/route.ts(112,11): error TS1128: Declaration or statement expected.
+app/api/doctor/applications/[id]/status/route.ts(138,12): error TS1128: Declaration or statement expected.
+app/api/doctor/applications/[id]/status/route.ts(142,12): error TS1128: Declaration or statement expected.
+app/api/doctor/applications/[id]/status/route.ts(174,5): error TS1472: 'catch' or 'finally' expected.
+app/api/doctor/applications/[id]/status/route.ts(175,5): error TS1005: 'try' expected.
+app/api/doctor/applications/[id]/status/route.ts(179,1): error TS1128: Declaration or statement expected.
+app/api/patient/[token]/book/route.ts(105,14): error TS1005: ';' expected.
+app/api/patient/[token]/book/route.ts(106,21): error TS1005: ';' expected.
+app/api/patient/[token]/book/route.ts(107,8): error TS1128: Declaration or statement expected.
+app/api/patient/[token]/book/route.ts(107,9): error TS1128: Declaration or statement expected.
+app/api/patient/[token]/book/route.ts(107,10): error TS1005: 'try' expected.
+app/api/patient/[token]/book/route.ts(107,18): error TS1005: ')' expected.
+app/api/patient/[token]/book/route.ts(107,37): error TS1005: ';' expected.
+app/api/patient/[token]/book/route.ts(114,3): error TS1472: 'catch' or 'finally' expected.
+app/api/patient/[token]/book/route.ts(114,5): error TS1005: 'try' expected.
+app/api/patient/[token]/book/route.ts(117,1): error TS1128: Declaration or statement expected.
+app/api/patient/[token]/booking/route.ts(62,17): error TS1128: Declaration or statement expected.
+app/api/patient/[token]/route.ts(210,14): error TS1005: ';' expected.
+app/api/patient/[token]/route.ts(211,19): error TS1005: ';' expected.
+app/api/patient/[token]/route.ts(212,21): error TS1005: ';' expected.
+app/api/patient/[token]/route.ts(213,15): error TS1005: ';' expected.
+app/api/patient/[token]/route.ts(214,8): error TS1128: Declaration or statement expected.
+app/api/patient/[token]/route.ts(219,5): error TS1472: 'catch' or 'finally' expected.
+app/api/patient/[token]/route.ts(232,14): error TS1005: ';' expected.
+app/api/patient/[token]/route.ts(233,19): error TS1005: ';' expected.
+app/api/patient/[token]/route.ts(234,21): error TS1005: ';' expected.
+app/api/patient/[token]/route.ts(235,15): error TS1005: ';' expected.
+app/api/patient/[token]/route.ts(236,14): error TS1005: ';' expected.
+app/api/patient/[token]/route.ts(237,8): error TS1128: Declaration or statement expected.
+app/api/patient/[token]/route.ts(243,3): error TS1128: Declaration or statement expected.
+app/api/patient/[token]/route.ts(243,5): error TS1005: 'try' expected.
+app/api/patient/[token]/route.ts(246,1): error TS1128: Declaration or statement expected.
+app/api/patient/[token]/select-slot/route.ts(47,5): error TS1472: 'catch' or 'finally' expected.
+app/api/patient/[token]/select-slot/route.ts(93,5): error TS1005: 'try' expected.
+app/api/patient/[token]/select-slot/route.ts(97,1): error TS1128: Declaration or statement expected.
+app/api/register/bc/route.ts(27,17): error TS1005: ';' expected.
+app/api/register/bc/route.ts(28,16): error TS1005: ';' expected.
+app/api/register/bc/route.ts(29,20): error TS1005: ';' expected.
+app/api/register/bc/route.ts(30,12): error TS1005: ';' expected.
+app/api/register/bc/route.ts(31,14): error TS1005: ';' expected.
+app/api/register/bc/route.ts(31,37): error TS1128: Declaration or statement expected.
+app/api/register/bc/route.ts(33,19): error TS1005: ';' expected.
+app/api/register/bc/route.ts(34,21): error TS1005: ';' expected.
+app/api/register/bc/route.ts(35,24): error TS1005: ';' expected.
+app/api/register/bc/route.ts(36,29): error TS1005: ';' expected.
+app/api/register/bc/route.ts(37,13): error TS1005: ';' expected.
+app/api/register/bc/route.ts(38,5): error TS1109: Expression expected.
+app/api/register/bc/route.ts(38,6): error TS1472: 'catch' or 'finally' expected.
+app/api/register/bc/route.ts(71,5): error TS1005: 'try' expected.
+app/api/register/bc/route.ts(75,1): error TS1128: Declaration or statement expected.
+app/dashboard/bc/requests/page.tsx(24,5): error TS1128: Declaration or statement expected.
+app/dashboard/bc/requests/page.tsx(65,11): error TS1109: Expression expected.
+app/dashboard/bc/requests/page.tsx(70,1): error TS1128: Declaration or statement expected.
+app/dashboard/layout.tsx(18,5): error TS1005: ')' expected.
+app/dashboard/layout.tsx(19,3): error TS1109: Expression expected.
+app/dashboard/page.tsx(426,1): error TS1128: Declaration or statement expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(206,23): error TS1005: '}' expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(207,19): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(207,21): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(208,17): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(211,19): error TS17002: Expected corresponding JSX closing tag for 'div'.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(212,17): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(238,13): error TS17015: Expected corresponding closing tag for JSX fragment.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(238,16): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(255,23): error TS1005: ')' expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(258,19): error TS1005: ',' expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(258,31): error TS1005: ',' expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(263,20): error TS1005: ',' expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(363,13): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(363,15): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(366,11): error TS1005: ')' expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(379,9): error TS1128: Declaration or statement expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(379,11): error TS1109: Expression expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(380,7): error TS1109: Expression expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(414,5): error TS1128: Declaration or statement expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(415,3): error TS1109: Expression expected.
+app/dashboard/recommendations/[id]/matching/MatchingShortlistClient.tsx(416,1): error TS1128: Declaration or statement expected.
+app/dashboard/recommendations/[id]/page.tsx(328,33): error TS1005: ',' expected.
+app/dashboard/recommendations/[id]/page.tsx(328,78): error TS1005: '(' expected.
+app/dashboard/recommendations/[id]/page.tsx(328,81): error TS1003: Identifier expected.
+app/dashboard/recommendations/[id]/page.tsx(328,112): error TS1005: ')' expected.
+app/dashboard/recommendations/[id]/page.tsx(328,114): error TS17002: Expected corresponding JSX closing tag for 'div'.
+app/dashboard/recommendations/[id]/page.tsx(329,26): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/dashboard/recommendations/[id]/page.tsx(331,21): error TS1005: ')' expected.
+app/dashboard/recommendations/[id]/page.tsx(334,20): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/dashboard/recommendations/[id]/page.tsx(337,13): error TS1005: ')' expected.
+app/dashboard/recommendations/[id]/page.tsx(338,12): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/dashboard/recommendations/[id]/page.tsx(346,14): error TS1005: '}' expected.
+app/dashboard/recommendations/[id]/page.tsx(347,19): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/dashboard/recommendations/[id]/page.tsx(351,9): error TS1005: ')' expected.
+app/dashboard/recommendations/[id]/page.tsx(433,7): error TS1128: Declaration or statement expected.
+app/dashboard/recommendations/[id]/page.tsx(434,5): error TS1109: Expression expected.
+app/dashboard/recommendations/[id]/page.tsx(435,3): error TS1109: Expression expected.
+app/dashboard/recommendations/new/page.tsx(1414,13): error TS1109: Expression expected.
+app/page.tsx(160,8): error TS17008: JSX element 'section' has no corresponding closing tag.
+app/page.tsx(176,15): error TS2657: JSX expressions must have one parent element.
+app/page.tsx(184,13): error TS1005: ')' expected.
+app/page.tsx(185,13): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+app/page.tsx(187,7): error TS1005: ')' expected.
+app/page.tsx(190,16): error TS1005: ';' expected.
+app/page.tsx(190,30): error TS1005: ';' expected.
+app/page.tsx(190,35): error TS1136: Property assignment expected.
+app/page.tsx(190,40): error TS1005: ';' expected.
+app/page.tsx(253,7): error TS1128: Declaration or statement expected.
+app/page.tsx(256,16): error TS1005: ';' expected.
+app/page.tsx(256,27): error TS1005: ';' expected.
+app/page.tsx(256,32): error TS1136: Property assignment expected.
+app/page.tsx(256,37): error TS1005: ';' expected.
+app/page.tsx(256,75): error TS1128: Declaration or statement expected.
+app/page.tsx(257,9): error TS2657: JSX expressions must have one parent element.
+app/page.tsx(271,7): error TS1128: Declaration or statement expected.
+app/page.tsx(274,16): error TS1005: ';' expected.
+app/page.tsx(274,33): error TS1005: ';' expected.
+app/page.tsx(274,38): error TS1136: Property assignment expected.
+app/page.tsx(274,43): error TS1005: ';' expected.
+app/page.tsx(274,87): error TS1128: Declaration or statement expected.
+app/page.tsx(275,9): error TS2657: JSX expressions must have one parent element.
+app/page.tsx(309,7): error TS1128: Declaration or statement expected.
+app/page.tsx(312,16): error TS1005: ';' expected.
+app/page.tsx(312,25): error TS1005: ';' expected.
+app/page.tsx(312,30): error TS1136: Property assignment expected.
+app/page.tsx(312,35): error TS1005: ';' expected.
+app/page.tsx(312,71): error TS1128: Declaration or statement expected.
+app/page.tsx(332,7): error TS1128: Declaration or statement expected.
+app/page.tsx(335,5): error TS1128: Declaration or statement expected.
+app/page.tsx(336,3): error TS1109: Expression expected.
+app/page.tsx(337,1): error TS1128: Declaration or statement expected.
+app/patient/[token]/checkout/CheckoutClient.tsx(59,1): error TS1128: Declaration or statement expected.
+app/patient/[token]/checkout/page.tsx(255,1): error TS1128: Declaration or statement expected.
+app/patient/[token]/page.tsx(470,16): error TS1005: ';' expected.
+app/patient/[token]/page.tsx(470,34): error TS1005: ';' expected.
+app/patient/[token]/page.tsx(470,56): error TS1128: Declaration or statement expected.
+app/patient/[token]/page.tsx(472,8): error TS1472: 'catch' or 'finally' expected.
+app/patient/[token]/page.tsx(478,7): error TS1005: ',' expected.
+app/patient/[token]/page.tsx(494,17): error TS1005: ';' expected.
+app/patient/[token]/page.tsx(494,35): error TS1005: ';' expected.
+app/patient/[token]/page.tsx(494,57): error TS1128: Declaration or statement expected.
+app/patient/[token]/page.tsx(496,9): error TS1472: 'catch' or 'finally' expected.
+app/patient/[token]/page.tsx(503,8): error TS1005: ',' expected.
+app/patient/[token]/page.tsx(508,3): error TS1128: Declaration or statement expected.
+app/patient/[token]/page.tsx(575,3): error TS1128: Declaration or statement expected.
+app/patient/[token]/page.tsx(1244,1): error TS1128: Declaration or statement expected.
+app/register/bc/page.tsx(119,7): error TS1109: Expression expected.
+app/register/bc/page.tsx(361,23): error TS1005: ':' expected.
+components/admin/VerificationQueue.tsx(126,5): error TS1005: ':' expected.
+components/admin/VerificationQueue.tsx(170,17): error TS1109: Expression expected.
+components/dashboard/RequestCard.tsx(135,1): error TS1128: Declaration or statement expected.
+components/marketing/Footer.tsx(33,3): error TS1005: ',' expected.
+components/marketing/Footer.tsx(33,4): error TS1128: Declaration or statement expected.
+components/marketing/Footer.tsx(33,8): error TS1005: ';' expected.
+components/marketing/Footer.tsx(109,1): error TS1128: Declaration or statement expected.
+components/marketing/Navbar.tsx(54,3): error TS1005: ',' expected.
+components/marketing/Navbar.tsx(54,4): error TS1128: Declaration or statement expected.
+components/marketing/Navbar.tsx(54,8): error TS1005: ';' expected.
+components/marketing/Navbar.tsx(188,1): error TS1128: Declaration or statement expected.
+components/notifications/NotificationsView.tsx(143,8): error TS17008: JSX element 'main' has no corresponding closing tag.
+components/notifications/NotificationsView.tsx(193,19): error TS1005: ')' expected.
+components/notifications/NotificationsView.tsx(193,21): error TS17002: Expected corresponding JSX closing tag for 'button'.
+components/notifications/NotificationsView.tsx(194,18): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+components/notifications/NotificationsView.tsx(195,17): error TS17002: Expected corresponding JSX closing tag for 'div'.
+components/notifications/NotificationsView.tsx(406,7): error TS1005: ')' expected.
+components/notifications/NotificationsView.tsx(407,5): error TS1109: Expression expected.
+components/notifications/NotificationsView.tsx(408,3): error TS1109: Expression expected.
+lib/cancel-appointment.ts(183,1): error TS1128: Declaration or statement expected.

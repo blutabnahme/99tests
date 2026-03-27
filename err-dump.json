@@ -1,0 +1,6 @@
+{
+  "code": "23502",
+  "details": "Failing row contains (BLT-2026-5482, fe30719c-3769-4aca-a448-dcac46c48e1d, 46d333ba-26de-41e3-b595-eb3b25237dd3, [\"cbc\"], lab_1, normal, null, null, [{\"item_id\": \"mat_1\", \"quantity\": 1}], hc, hc, patient_decides, t, matched, null, 2026-03-16 05:11:49.231099+00, null, null, 1, null, null, null).",
+  "hint": null,
+  "message": "null value in column \"mobility\" of relation \"case\" violates not-null constraint"
+}

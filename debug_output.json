@@ -1,0 +1,12 @@
+{
+  "hc_user_from_auth": {
+    "id": "afeebfc8-eb82-4c9b-b9ae-52606245a092",
+    "email": "hc2@blutabnahme.de"
+  },
+  "case_6147": {
+    "id": "BLT-2026-6147",
+    "status": "created",
+    "hc_id": "e908ac10-1fef-4096-b264-33cb2ef1c306",
+    "created_at": "2026-03-17T03:39:03.666788+00:00"
+  }
+}

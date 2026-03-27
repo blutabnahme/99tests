@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Camada_2" data-name="Camada 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 308.95 200">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #5c564f;
+      }
+
+      .cls-2 {
+        fill: #007680;
+      }
+    </style>
+  </defs>
+  <g id="Camada_1-2" data-name="Camada 1">
+    <g>
+      <circle class="cls-2" cx="127.93" cy="72.07" r="16.22"/>
+      <circle class="cls-2" cx="127.93" cy="127.93" r="16.22"/>
+      <circle class="cls-1" cx="181.02" cy="127.93" r="16.22"/>
+      <circle class="cls-1" cx="181.02" cy="72.07" r="16.22"/>
+      <circle class="cls-2" cx="16.22" cy="72.07" r="16.22"/>
+      <circle class="cls-2" cx="16.22" cy="16.22" r="16.22"/>
+      <circle class="cls-2" cx="127.93" cy="16.22" r="16.22"/>
+      <circle class="cls-2" cx="16.22" cy="127.93" r="16.22"/>
+      <circle class="cls-2" cx="72.07" cy="127.93" r="16.22"/>
+      <circle class="cls-1" cx="72.07" cy="72.07" r="16.22"/>
+      <circle class="cls-2" cx="72.07" cy="16.22" r="16.22"/>
+      <circle class="cls-1" cx="292.73" cy="127.93" r="16.22"/>
+      <circle class="cls-1" cx="292.73" cy="72.07" r="16.22"/>
+      <circle class="cls-1" cx="181.02" cy="183.78" r="16.22"/>
+      <circle class="cls-1" cx="292.73" cy="183.78" r="16.22"/>
+      <circle class="cls-1" cx="236.88" cy="183.78" r="16.22"/>
+      <circle class="cls-2" cx="236.88" cy="127.93" r="16.22"/>
+      <circle class="cls-1" cx="236.88" cy="72.07" r="16.22"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,16 @@
+{
+  "hc": {
+    "caseSuccess": {
+      "title": "Case Created!",
+      "desc": "Case {id} has been successfully registered. The next step is for the patient to provide their digital consent.",
+      "linkBox": {
+        "title": "Patient Consent Link",
+        "desc": "Share this securely with your patient.",
+        "copied": "Copied",
+        "copy": "Copy"
+      },
+      "btnDashboard": "Go to Dashboard",
+      "btnNewCase": "Create another case"
+    }
+  }
+}

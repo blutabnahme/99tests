@@ -1,0 +1,26 @@
+{
+  "user": {
+    "id": "e908ac10-1fef-4096-b264-33cb2ef1c306",
+    "aud": "authenticated",
+    "role": "authenticated",
+    "email": "hc@blutabnahme.de",
+    "email_confirmed_at": "2026-03-17T00:32:19.043626Z",
+    "phone": "",
+    "confirmed_at": "2026-03-17T00:32:19.043626Z",
+    "last_sign_in_at": "2026-03-17T01:26:49.241278Z",
+    "app_metadata": {
+      "provider": "email",
+      "providers": [
+        "email"
+      ]
+    },
+    "user_metadata": {
+      "email_verified": true,
+      "role": "healthcare_company"
+    },
+    "identities": null,
+    "created_at": "2026-03-16T01:53:49.377026Z",
+    "updated_at": "2026-03-17T03:22:53.519788Z",
+    "is_anonymous": false
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "hc": {
+    "caseDetail": {
+      "breadcrumb": {
+        "dashboard": "Dashboard",
+        "cases": "Cases"
+      },
+      "header": {
+        "caseId": "Case {id}",
+        "urgent": "Urgent",
+        "createdOn": "Created on {date}"
+      },
+      "timeline": {
+        "open": "Open",
+        "matched": "Matched",
+        "payment": "Payment",
+        "booked": "Booked",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
+      },
+      "collectionConfirmed": {
+        "title": "Collection Confirmed",
+        "desc": "The collection has been verified successfully."
+      },
+      "requirements": {
+        "title": "Lab & Test Requirements",
+        "requestedTests": "Requested Tests",
+        "generalDraw": "General Blood Draw",
+        "targetLabs": "Target Laboratories",
+        "materials": "Materials:"
+      },
+      "logistics": {
+        "title": "Logistics & Settings",
+        "mobilityRequest": "Mobility Request:",
+        "homeVisit": "Home Visit",
+        "practice": "Practice",
+        "returnShipping": "Return Shipping:",
+        "platformReturn": "Platform organizes return",
+        "hcReturn": "HC organizes return",
+        "patientGender": "Patient Gender:",
+        "unspecified": "Unspecified",
+        "bcSelection": "BC Selection:",
+        "patientDecides": "Patient Decides",
+        "clinicShortlist": "Clinic Shortlist",
+        "clinicApproval": "Clinic Approval",
+        "manual": "Manual"
+      },
+      "collector": {
+        "title": "Assigned Collector & Appointment",
+        "bcLabel": "Blood Collector",
+        "verifiedPro": "Verified Professional",
+        "waitingAssignment": "Waiting for assignment",
+        "appointmentLabel": "Appointment Details",
+        "collectionCompleted": "Collection completed",
+        "appointmentCancelled": "Appointment cancelled",
+        "confirmedAwaiting": "Confirmed · Awaiting collection",
+        "notScheduled": "Not yet scheduled"
+      },
+      "patient": {
+        "title": "Patient Details",
+        "viewProfile": "View Profile",
+        "dob": "DOB:"
+      },
+      "billing": {
+        "title": "Billing",
+        "paymentStatus": "Payment {status}",
+        "noPayments": "No payments recorded for this case yet."
+      }
+    },
+    "matching": {
+      "patientDecides": {
+        "title": "Patient Chooses Collector",
+        "desc": "This case is configured for the patient to decide. You do not need to manually shortlist candidates.",
+        "returnBtn": "Return to Case"
+      },
+      "formatting": {
+        "urgent": "Urgent",
+        "emergency": "Emergency",
+        "standard": "Standard",
+        "homeVisit": "Home Visit",
+        "practice": "Practice",
+        "unknownLocation": "Unknown Location",
+        "generalDraw": "General Blood Draw",
+        "unspecified": "Unspecified",
+        "addressNotProvided": "Address not provided",
+        "tomorrow": "Tomorrow, 10:00"
+      },
+      "client": {
+        "breadcrumbApprove": "Approve Shortlist",
+        "title": "Approve Blood Collectors",
+        "desc": "Review applications and select which professionals to include in the patient's shortlist.",
+        "acceptingBannerTitle": "Accepting applications — {hours} hours remaining.",
+        "acceptingBannerDesc": "{count} collector(s) have applied so far. You can approve a shortlist now or wait for more applicants.",
+        "steps": {
+          "step1": "You approve qualified collectors",
+          "step2": "Patient receives the shortlist",
+          "step3": "Patient picks their preferred BC"
+        },
+        "sent": {
+          "title": "Shortlist sent to {patient}!",
+          "desc": "The patient will receive an email and SMS with a link to view the {count} approved blood collectors and choose their preferred one."
+        },
+        "summary": {
+          "patient": "Patient",
+          "test": "Test",
+          "urgency": "Urgency",
+          "type": "Type",
+          "location": "Location"
+        },
+        "sort": {
+          "label": "Sort:",
+          "recommended": "Recommended",
+          "distance": "Distance",
+          "price": "Price",
+          "rating": "Rating",
+          "experience": "Experience"
+        },
+        "filter": {
+          "minor": "Pediatric",
+          "elderly": "Elderly",
+          "difficult_veins": "Difficult Veins",
+          "centrifuge": "Centrifuge",
+          "freezer": "Freezer"
+        },
+        "card": {
+          "bestMatch": "BEST MATCH — RECOMMENDED",
+          "approved": "APPROVED FOR SHORTLIST",
+          "hcInvited": "HC Invited",
+          "appliedAgo": "Applied {hours} hours ago",
+          "estFee": "Est. fee",
+          "includesTravel": "includes travel",
+          "addToShortlist": "Add to Shortlist",
+          "remove": "Remove",
+          "messageFromBc": "Message from Collector",
+          "slots": "{count} slots"
+        },
+        "empty": {
+          "title": "No matches found",
+          "desc": "Try removing some filters to see more results.",
+          "clearBtn": "Clear all filters"
+        },
+        "footer": {
+          "onShortlist": "{count} collector(s) on shortlist",
+          "patientWillChoose": "Patient will choose from {names}",
+          "sending": "Sending...",
+          "sendBtn": "Send Shortlist to Patient"
+        }
+      }
+    }
+  }
+}

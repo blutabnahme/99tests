@@ -1,0 +1,18 @@
+{
+  "matchedUser": null,
+  "hcTable": {
+    "id": "e908ac10-1fef-4096-b264-33cb2ef1c306",
+    "name": "Berlin Health Lab",
+    "contact_email": "hc@blutabnahme.de",
+    "phone": null,
+    "address": null,
+    "type": "lab",
+    "status": "active",
+    "api_enabled": true,
+    "api_key_hash": "029a922f05896ecf1734ef0b31dd27e9aa31af6bc8b6b9ae9069e045cab0a665",
+    "default_bc_selection_mode": "patient_decides",
+    "created_at": "2026-03-16T01:53:49.958122+00:00",
+    "api_key_prefix": "blt_sk_8e39d4cf",
+    "api_rate_limit": 100
+  }
+}

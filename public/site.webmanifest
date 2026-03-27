@@ -1,0 +1,15 @@
+{
+  "name": "Hematch",
+  "short_name": "Hematch",
+  "description": "Blood collection, matched.",
+  "icons": [
+    {
+      "src": "/logo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#C51F3A",
+  "background_color": "#FFFFFF",
+  "display": "standalone"
+}
