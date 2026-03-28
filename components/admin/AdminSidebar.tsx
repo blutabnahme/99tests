@@ -70,7 +70,7 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
     <aside className="w-full lg:w-[260px] bg-white lg:border-r border-gray-200 flex flex-col shrink-0 h-full lg:h-screen lg:sticky lg:top-0">
       <div className="hidden lg:flex p-6 pb-4 mb-3 items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <img src="/logo.svg" alt="99Tests" className="h-8 w-auto" />
+          <img src="/logo.svg" alt="99Tests" className="h-6 w-auto" />
         </div>
       </div>
       

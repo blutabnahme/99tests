@@ -50,7 +50,7 @@ export function DoctorSidebar({ onNavigate }: { onNavigate?: () => void }) {
       {/* Logo and Notifications */}
       <div className="hidden lg:flex p-6 pb-4 mb-3 items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <img src="/logo.svg" alt="99Tests" className="h-8 w-auto" />
+          <img src="/logo.svg" alt="99Tests" className="h-6 w-auto" />
         </div>
       </div>
 

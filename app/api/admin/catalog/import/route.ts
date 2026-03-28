@@ -89,9 +89,9 @@ export async function POST(request: Request) {
         const lab_cost = parseNum(row['Lab Cost']);
         const price_insured = parseNum(row['Price Insured']);
         const price_uninsured = parseNum(row['Price Uninsured']);
-        const price_zone_1 = parseNum(row['Price Zone 1']);
-        const price_zone_2 = parseNum(row['Price Zone 2']);
-        const price_zone_3 = parseNum(row['Price Zone 3']);
+        const price_zone1 = parseNum(row['Price Zone 1']);
+        const price_zone2 = parseNum(row['Price Zone 2']);
+        const price_zone3 = parseNum(row['Price Zone 3']);
 
         let materials = null;
         if (row['Materials']) {
@@ -147,16 +147,16 @@ export async function POST(request: Request) {
                     type: typeRaw,
                     category: row['Category'] || null,
                     lab_id,
-                    lab_cost, price_insured, price_uninsured, price_zone_1, price_zone_2, price_zone_3,
+                    lab_cost, price_insured, price_uninsured, price_zone1, price_zone2, price_zone3,
                     materials,
-                    sample_shipping: row['Sample Shipping'] || null,
+                    sample_shipping: row['Sample Shipping'] ? row['Sample Shipping'].toLowerCase() : null,
                     preanalytics: row['Preanalytics'] || null,
                     more_info_url: row['More Info URL'] || null,
                     edv_code: row['EDV Code'] || null,
-                    goa_digit: row['GoÄ Digit'] || null,
-                    goa_costs: row['GoÄ Costs'] || null,
-                    goa_names: row['GoÄ Names'] || null,
-                    goa_factor: row['GoÄ Factor'] || null,
+                    goae_digit: row['GoÄ Digit'] || null,
+                    goae_costs: row['GoÄ Costs'] || null,
+                    goae_names: row['GoÄ Names'] || null,
+                    goae_factor: row['GoÄ Factor'] || null,
                     included_parameters,
                     is_active: row['Active'] === 'no' ? false : true // default true
                 }

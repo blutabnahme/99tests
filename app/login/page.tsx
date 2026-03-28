@@ -76,7 +76,7 @@ export default function LoginPage() {
       {/* Logo */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md flex justify-center mb-8">
         <Link href="/" className="flex items-center gap-2">
-          <img src="/logo.svg" alt="99Tests" className="h-10 w-auto" />
+          <img src="/logo.svg" alt="99Tests" className="h-6 w-auto" />
         </Link>
       </div>
 

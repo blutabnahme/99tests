@@ -1,6 +1,8 @@
 "use client";
 import React from 'react';
 import { useState, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import MobileHeader from '@/components/ui/MobileHeader';
 import MobileSidebar from '@/components/ui/MobileSidebar';
 import { DoctorSidebar } from '@/components/dashboard/DoctorSidebar';
@@ -20,10 +22,22 @@ const sidebars = {
 
 export default function MobileLayoutWrapper({ sidebarType, children }: MobileLayoutWrapperProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname() || '';
   const handleMenuToggle = useCallback(() => setSidebarOpen(prev => !prev), []);
   const handleClose = useCallback(() => setSidebarOpen(false), []);
 
   const SidebarComponent = sidebars[sidebarType];
+
+  if (pathname.includes('/recommendations/new')) {
+    return (
+      <div className="flex flex-col min-h-screen bg-[#F7F7F8] font-body text-near-black">
+
+        <main className="flex-1 w-full bg-[#F7F7F8]">
+          {children}
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F7F7F8] font-body text-near-black">

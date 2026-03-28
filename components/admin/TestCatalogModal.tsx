@@ -126,19 +126,19 @@ export default function TestCatalogModal({ test, categories, laboratories, onClo
     lab_cost: '',
     price_insured: '',
     price_uninsured: '',
-    price_zone_1: '',
-    price_zone_2: '',
-    price_zone_3: '',
+    price_zone1: '',
+    price_zone2: '',
+    price_zone3: '',
     
-    sample_shipping: 'Standard',
+    sample_shipping: 'standard',
     preanalytics: '',
     more_info_url: '',
     
     edv_code: '',
-    goa_digit: '',
-    goa_costs: '',
-    goa_names: '',
-    goa_factor: '',
+    goae_digit: '',
+    goae_costs: '',
+    goae_names: '',
+    goae_factor: '',
   });
 
   const [nameTranslations, setNameTranslations] = useState({
@@ -180,19 +180,19 @@ export default function TestCatalogModal({ test, categories, laboratories, onClo
         lab_cost: test.lab_cost !== null ? String(test.lab_cost) : '',
         price_insured: test.price_insured !== null ? String(test.price_insured) : '',
         price_uninsured: test.price_uninsured !== null ? String(test.price_uninsured) : '',
-        price_zone_1: test.price_zone_1 !== null ? String(test.price_zone_1) : '',
-        price_zone_2: test.price_zone_2 !== null ? String(test.price_zone_2) : '',
-        price_zone_3: test.price_zone_3 !== null ? String(test.price_zone_3) : '',
+        price_zone1: test.price_zone1 !== null ? String(test.price_zone1) : '',
+        price_zone2: test.price_zone2 !== null ? String(test.price_zone2) : '',
+        price_zone3: test.price_zone3 !== null ? String(test.price_zone3) : '',
         
-        sample_shipping: test.sample_shipping || 'Standard',
+        sample_shipping: test.sample_shipping || 'standard',
         preanalytics: test.preanalytics || '',
         more_info_url: test.more_info_url || '',
         
         edv_code: test.edv_code || '',
-        goa_digit: test.goa_digit || '',
-        goa_costs: test.goa_costs || '',
-        goa_names: test.goa_names || '',
-        goa_factor: test.goa_factor || '',
+        goae_digit: test.goae_digit || '',
+        goae_costs: test.goae_costs || '',
+        goae_names: test.goae_names || '',
+        goae_factor: test.goae_factor || '',
       });
 
       if (test.name_translations) {
@@ -342,7 +342,7 @@ export default function TestCatalogModal({ test, categories, laboratories, onClo
     }
 
     // Convert strings to nums where necessary
-    const numericFields = ['lab_cost', 'price_insured', 'price_uninsured', 'price_zone_1', 'price_zone_2', 'price_zone_3'];
+    const numericFields = ['lab_cost', 'price_insured', 'price_uninsured', 'price_zone1', 'price_zone2', 'price_zone3'];
     for (const f of numericFields) {
       if (payload[f] !== undefined) {
         if (payload[f] === '') payload[f] = null;
@@ -545,7 +545,7 @@ export default function TestCatalogModal({ test, categories, laboratories, onClo
                   <label className="text-[13px] font-medium text-gray-700">Price: Foreign Zone 1</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">€</span>
-                    <input type="number" step="0.01" name="price_zone_1" value={formData.price_zone_1} onChange={handleChange} className="w-full h-11 pl-8 pr-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
+                    <input type="number" step="0.01" name="price_zone1" value={formData.price_zone1} onChange={handleChange} className="w-full h-11 pl-8 pr-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
                   </div>
                 </div>
 
@@ -553,7 +553,7 @@ export default function TestCatalogModal({ test, categories, laboratories, onClo
                   <label className="text-[13px] font-medium text-gray-700">Price: Foreign Zone 2</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">€</span>
-                    <input type="number" step="0.01" name="price_zone_2" value={formData.price_zone_2} onChange={handleChange} className="w-full h-11 pl-8 pr-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
+                    <input type="number" step="0.01" name="price_zone2" value={formData.price_zone2} onChange={handleChange} className="w-full h-11 pl-8 pr-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
                   </div>
                 </div>
                 
@@ -561,7 +561,7 @@ export default function TestCatalogModal({ test, categories, laboratories, onClo
                   <label className="text-[13px] font-medium text-gray-700">Price: Foreign Zone 3</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">€</span>
-                    <input type="number" step="0.01" name="price_zone_3" value={formData.price_zone_3} onChange={handleChange} className="w-full h-11 pl-8 pr-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
+                    <input type="number" step="0.01" name="price_zone3" value={formData.price_zone3} onChange={handleChange} className="w-full h-11 pl-8 pr-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
                   </div>
                 </div>
               </div>
@@ -627,10 +627,10 @@ export default function TestCatalogModal({ test, categories, laboratories, onClo
                   <div className="space-y-1.5 md:col-span-2">
                     <label className="text-[13px] font-medium text-gray-700">Sample Shipping *</label>
                     <select name="sample_shipping" value={formData.sample_shipping} onChange={handleChange} className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all bg-white appearance-none pr-10 bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22currentColor%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.293%207.293a1%201%200%20011.414%200L10%2010.586l3.293-3.293a1%201%200%20111.414%201.414l-4%204a1%201%200%2001-1.414%200l-4-4a1%201%200%20010-1.414z%22%20clip-rule%3D%22evenodd%22%20%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-no-repeat bg-[position:right_12px_center]">
-                      <option value="Standard">Standard</option>
-                      <option value="Prio">Prio</option>
-                      <option value="Express">Express</option>
-                      <option value="GoLogistik">GoLogistik</option>
+                      <option value="standard">Standard</option>
+                      <option value="prio">Prio</option>
+                      <option value="express">Express</option>
+                      <option value="gologistik">GoLogistik</option>
                     </select>
                   </div>
                   
@@ -657,19 +657,19 @@ export default function TestCatalogModal({ test, categories, laboratories, onClo
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[13px] font-medium text-gray-700">GoÄ Digit(s)</label>
-                    <input name="goa_digit" value={formData.goa_digit} onChange={handleChange} placeholder="e.g. 4288 (2x)" className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
+                    <input name="goae_digit" value={formData.goae_digit} onChange={handleChange} placeholder="e.g. 4288 (2x)" className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[13px] font-medium text-gray-700">GoÄ Factor</label>
-                    <input name="goa_factor" value={formData.goa_factor} onChange={handleChange} placeholder="e.g. 1.15" className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
+                    <input name="goae_factor" value={formData.goae_factor} onChange={handleChange} placeholder="e.g. 1.15" className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
                   </div>
                   <div className="space-y-1.5 md:col-span-2">
                     <label className="text-[13px] font-medium text-gray-700">GoÄ Costs</label>
-                    <input name="goa_costs" value={formData.goa_costs} onChange={handleChange} placeholder="e.g. 20.40 (2x)" className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
+                    <input name="goae_costs" value={formData.goae_costs} onChange={handleChange} placeholder="e.g. 20.40 (2x)" className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
                   </div>
                   <div className="space-y-1.5 md:col-span-2">
                     <label className="text-[13px] font-medium text-gray-700">GoÄ Names (Description)</label>
-                    <textarea name="goa_names" value={formData.goa_names} onChange={handleChange} className="w-full min-h-[80px] p-4 text-[14px] rounded-[16px] border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
+                    <textarea name="goae_names" value={formData.goae_names} onChange={handleChange} className="w-full min-h-[80px] p-4 text-[14px] rounded-[16px] border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-gray-400" />
                   </div>
                </div>
             </div>

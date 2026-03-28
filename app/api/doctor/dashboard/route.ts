@@ -36,12 +36,6 @@ export async function GET() {
       .select('*', { count: 'exact', head: true })
       .eq('doctor_id', doctorId);
 
-    // 2. Pending Results (tt_order linked to doctor_id with specific status)
-    const { count: pendingResults } = await supabaseAdmin
-      .from('tt_order')
-      .select('*', { count: 'exact', head: true })
-      .eq('doctor_id', doctorId)
-      .in('status', ['at_lab', 'returning_to_lab']);
 
     // 3. Active Patients
     const { count: activePatients } = await supabaseAdmin
@@ -49,7 +43,7 @@ export async function GET() {
       .select('*', { count: 'exact', head: true })
       .eq('doctor_id', doctorId);
 
-    // 4. Last 10 Recommendations
+    // 3. Fetch Recommendations (up to 250 for pipeline)
     const { data: recentRecs } = await supabaseAdmin
       .from('tt_recommendation')
       .select(`
@@ -63,7 +57,30 @@ export async function GET() {
       `)
       .eq('doctor_id', doctorId)
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(250);
+
+    const status_counts = {
+      created: 0,
+      sent: 0,
+      paid: 0,
+      kit_shipped: 0,
+      collection_organized: 0,
+      at_lab: 0,
+      results_ready: 0
+    };
+
+    if (recentRecs) {
+      recentRecs.forEach(r => {
+        const s = r.status;
+        if (s === 'created') status_counts.created++;
+        else if (s === 'sent') status_counts.sent++;
+        else if (s === 'paid') status_counts.paid++;
+        else if (s === 'preparing' || s === 'kit_shipped') status_counts.kit_shipped++;
+        else if (s === 'collection_organized' || s === 'awaiting_collection') status_counts.collection_organized++;
+        else if (s === 'returning_to_lab' || s === 'at_lab') status_counts.at_lab++;
+        else if (s === 'results_ready' || s === 'completed') status_counts.results_ready++;
+      });
+    }
 
     // Map the shape for the consumer
     const mappedRecommendations = (recentRecs || []).map(r => {
@@ -86,8 +103,8 @@ export async function GET() {
     return NextResponse.json({
       metrics: {
         total_recommendations: totalRecs || 0,
-        pending_results: pendingResults || 0,
-        active_patients: activePatients || 0
+        active_patients: activePatients || 0,
+        status_counts
       },
       recent_recommendations: mappedRecommendations
     });

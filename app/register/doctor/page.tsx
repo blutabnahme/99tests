@@ -427,7 +427,7 @@ export default function DoctorRegistrationPage() {
       {/* ════════ HEADER ════════ */}
       <header className="sticky top-0 z-30 flex items-center justify-between w-full px-4 py-3 bg-white border-b border-gray-100 shrink-0 mb-8">
         <Link href="/">
-          <img src="/logo.svg" alt="99Tests" className="h-7 sm:h-8 w-auto" />
+          <img src="/logo.svg" alt="99Tests" className="h-6 w-auto" />
         </Link>
         <div className="text-[12px] sm:text-[13px] text-gray-500 whitespace-nowrap">
           <span className="hidden sm:inline">{t('auth.hasAccount')}</span> <Link href="/login" className="text-primary-dark font-semibold hover:text-primary ml-1">{t('auth.login')}</Link>

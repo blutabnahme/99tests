@@ -76,7 +76,7 @@ export function Navbar() {
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 px-4 sm:px-6 lg:px-12 h-16 flex items-center justify-between ${navBg ? "bg-white/90 backdrop-blur-md border-b border-gray-200/50" : "bg-transparent border-b border-transparent"}`}>
         <div className="flex items-center gap-12">
           <Link href="/" className="flex items-center gap-2.5">
-            <img src="/logo.svg" alt="99Tests" className="h-8 w-auto relative z-50" />
+            <img src="/logo.svg" alt="99Tests" className="h-6 w-auto relative z-50" />
           </Link>
           <div className="hidden lg:flex gap-7">
             {navLinks.map((link) => {

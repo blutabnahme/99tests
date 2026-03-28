@@ -2,7 +2,7 @@ import React from 'react';
 
 const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
   // Recommendation statuses
-  created: { label: 'CREATED', bg: '#F3F4F6', text: '#6E7280' },
+  created: { label: 'DRAFT', bg: '#F3F4F6', text: '#6E7280' },
   sent: { label: 'SENT', bg: '#EFF6FF', text: '#2563EB' },
   expired: { label: 'EXPIRED', bg: '#F3F4F6', text: '#6E7280' },
 

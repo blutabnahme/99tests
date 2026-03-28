@@ -72,7 +72,7 @@ export default function MobileHeader({ onMenuToggle, isOpen }: MobileHeaderProps
             <path d="M3 15H17" stroke="#1A1D23" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
-        <Image src="/logo.svg" alt="99Tests" width={110} height={28} className="h-7 sm:h-8 w-auto" priority />
+        <Image src="/logo.svg" alt="99Tests" width={110} height={24} className="h-6 w-auto" priority />
       </div>
       
       <button 
