@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { createNotification } from './notifications';
+
 
 export async function notifyAdmins(
   type: any, 

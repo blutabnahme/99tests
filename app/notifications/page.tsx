@@ -4,23 +4,23 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 export default async function NotificationsPage() {
-  const supabase = createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
+ const supabase = createServerSupabaseClient();
+ const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+ if (!user) {
+ redirect("/login");
+ }
 
-  const role = user.user_metadata?.role;
+ const role = user.user_metadata?.role;
 
-  if (role === "doctor_practice") {
-    redirect("/dashboard/notifications");
-  } else if (role === "blood_collector") {
-    redirect("/bc/notifications");
-  } else if (role === "admin") {
-    redirect("/admin/notifications");
-  } else {
-    // Fallback if role is unfamiliar
-    redirect("/dashboard");
-  }
+ if (role === "doctor_practice") {
+ redirect("/dashboard/notifications");
+ } else if (role === "blood_collector") {
+ redirect("/bc/notifications");
+ } else if (role === "admin") {
+ redirect("/admin/notifications");
+ } else {
+ // Fallback if role is unfamiliar
+ redirect("/dashboard");
+ }
 }

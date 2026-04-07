@@ -1,231 +1,140 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { createNotification } from '@/lib/notifications';
-import { deliverWebhook } from '@/lib/webhooks';
 
-// Initialize Supabase with the Service Role key to bypass RLS for this specific token-based lookup
 const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+ process.env.NEXT_PUBLIC_SUPABASE_URL!,
+ process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function GET(
-  request: Request,
-  { params }: { params: { token: string } }
+ request: Request,
+ { params }: { params: { token: string } }
 ) {
-  const { token } = params;
+ const { token } = params;
 
-  if (!token) {
-    return NextResponse.json({ error: 'Token is required' }, { status: 400 });
-  }
+ if (!token) return NextResponse.json({ error: 'Token is required' }, { status: 400 });
 
-  try {
-    // 1. Fetch the core Recommendation immediately.
-    const { data: caseRes, error: recommendationErr } = await supabaseAdmin
-      .from('recommendation')
-      .select('*, doctor_practice(id, name), patient(*)')
-      .eq('id', token)
-      .single();
+ try {
+ // 1. Validate Token
+ const { data: tokenRecord, error: tokenError } = await supabaseAdmin
+ .from('tt_patient_token')
+ .select('recommendation_id, expires_at, is_used')
+ .eq('token', token)
+ .single();
 
-    if (recommendationErr || !caseRes) {
-      console.error("DEBUG QUERY ERROR:", recommendationErr);
-      return NextResponse.json({ error: 'Recommendation not found or invalid token', details: recommendationErr }, { status: 404 });
-    }
+ if (tokenError || !tokenRecord) {
+ return NextResponse.json({ error: 'Invalid or expired magic link.' }, { status: 404 });
+ }
 
-    // 2. We depend on bc_selection_mode for matches, but we can parallelize matches, appointments, and reviews.
-    let appQuery = supabaseAdmin
-      .from('case_application')
-      .select('*, blood_collector(*)')
-      .eq('recommendation_id', token)
-      .order('applied_at', { ascending: false });
+ if (tokenRecord.is_used) {
+ return NextResponse.json({ error: 'This magic link has already been used.', used: true, recommendation_id: tokenRecord.recommendation_id }, { status: 400 });
+ }
 
-    if (caseRes.bc_selection_mode === 'clinic_shortlist') {
-      appQuery = appQuery.in('status', ['accepted']);
-    } else if (caseRes.bc_selection_mode === 'patient_decides') {
-      appQuery = appQuery.eq('status', 'applied');
-    } else if (caseRes.bc_selection_mode === 'clinic_approval') {
-      appQuery = appQuery.eq('status', 'accepted');
-    } else {
-      appQuery = appQuery.in('status', ['applied', 'accepted']);
-    }
+ if (new Date(tokenRecord.expires_at) < new Date()) {
+ return NextResponse.json({ error: 'This magic link has expired.' }, { status: 400 });
+ }
 
-    const [appPromiseData, aptPromiseData, revPromiseData, slotsPromiseData, configData] = await Promise.all([
-      appQuery,
-      supabaseAdmin.from('appointment').select('*').eq('recommendation_id', token).maybeSingle(),
-      supabaseAdmin.from('review').select('id').eq('recommendation_id', token).maybeSingle(),
-      supabaseAdmin.from('bc_proposed_slots').select('*').eq('recommendation_id', token).eq('status', 'proposed'),
-      supabaseAdmin.from('platform_config').select('id, value').in('id', ['commission', 'tax', 'pricing', 'fees'])
-    ]);
+ // 2. Fetch Core Recommendation + Items + Doctor + Patient
+ const { data: recData, error: recError } = await supabaseAdmin
+ .from('tt_recommendation')
+ .select(`
+ *,
+ doctor:doctor_id(id, practice_name, full_name, custom_service_fee_pct),
+ patient:patient_id(id, salutation, first_name, last_name, email, phone, date_of_birth, address_line1, address_line2, address_zip, address_city, address_country),
+ items:tt_recommendation_item(
+ id, quantity, unit_price, lab_cost, test_type,
+ test:test_id(name, sku, sample_shipping, preanalytics, type, laboratory:tt_laboratory(name))
+ )
+ `)
+ .eq('id', tokenRecord.recommendation_id)
+ .single();
 
-    if (appPromiseData.error) {
-      console.error("DEBUG APP QUERY ERROR:", appPromiseData.error);
-      return NextResponse.json({ error: 'Could not fetch applications' }, { status: 500 });
-    }
+ if (recError || !recData) {
+ return NextResponse.json({ error: 'Recommendation not found.' }, { status: 404 });
+ }
 
-    return NextResponse.json({
-      recommendationData: caseRes,
-      applications: appPromiseData.data || [],
-      appointment: aptPromiseData.data || null,
-      reviewExists: !!revPromiseData.data,
-      proposedSlots: slotsPromiseData.data || [],
-      platformConfig: configData.data || []
-    });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
+ // Check if an order already exists (payment already happened)
+ const { data: existingOrder } = await supabaseAdmin
+ .from('tt_order')
+ .select('id, status')
+ .eq('recommendation_id', recData.id)
+ .maybeSingle();
 
-export async function POST(
-  request: Request,
-  { params }: { params: { token: string } }
-) {
-  const { token } = params;
-  const body = await request.json();
-  const { action, payload } = body;
+ if (existingOrder) {
+ // Order exists — mark token as used if it wasn't already
+ await supabaseAdmin
+  .from('tt_patient_token')
+  .update({ is_used: true })
+  .eq('token', token);
 
-  try {
-    if (action === 'save_consent') {
-      const { consents } = payload;
-      const { error } = await supabaseAdmin.from('consent_record').insert(consents);
-      if (error) throw error;
-      return NextResponse.json({ success: true });
-    }
+ return NextResponse.json(
+  { error: 'This magic link has already been used.', used: true, recommendation_id: recData.id },
+  { status: 400 }
+ );
+ }
 
-    if (action === 'select_bc') {
-      const { selectedApplicationId } = payload;
-      
-      const { data: appData } = await supabaseAdmin.from('case_application').select('*, case:recommendation_id(*)').eq('id', selectedApplicationId).single();
-      if (!appData) return NextResponse.json({ error: 'App not found' }, { status: 404 });
-      
-      // Update selected application to accepted
-      await supabaseAdmin.from('case_application').update({ status: 'accepted' }).eq('id', selectedApplicationId);
-      
-      // Update Recommendation to 'matched'
-      await supabaseAdmin.from('recommendation').update({ status: 'matched' }).eq('id', token);
+ // 3. Dynamic Pricing Calculation
+ let serviceFeePct = recData.doctor?.custom_service_fee_pct;
+ if (serviceFeePct === null || serviceFeePct === undefined) {
+ const { data: config } = await supabaseAdmin.from('tt_service_config').select('service_fee_pct').limit(1).single();
+ serviceFeePct = config?.service_fee_pct || 15;
+ }
 
-      // --- Fire-and-forget side effects logic ---
-      (async () => {
-        try {
-          // Reject other pending/invited applications
-          const { data: otherApps } = await supabaseAdmin.from('case_application').select('id, bc_id').eq('recommendation_id', token).neq('id', selectedApplicationId).in('status', ['applied', 'invited', 'approved', 'accepted']);
-          if (otherApps && otherApps.length > 0) {
-            await supabaseAdmin.from('case_application').update({ status: 'rejected' }).in('id', otherApps.map(a => a.id));
-            
-            // Notify Rejected BCs
-            await Promise.all(otherApps.map(rejectedApp => 
-              createNotification(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                rejectedApp.bc_id,
-                'application_rejected',
-                'Application Update',
-                `Another collector was selected for recommendation ${token.split('-')[1]}.`,
-                `/bc/opportunities`
-              )
-            ));
-          }
+ const SHIPPING_COSTS: Record<string, number> = {
+ 'standard': 5.0,
+ 'prio': 9.0,
+ 'express': 15.0,
+ 'gologistik': 25.0
+ };
+ const SHIPPING_RANK: Record<string, number> = { 'standard': 1, 'prio': 2, 'express': 3, 'gologistik': 4 };
 
-          // Notify Accepted BC
-          await createNotification(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            appData.bc_id,
-            'application_accepted',
-            'Application Accepted',
-            `You've been selected for recommendation ${token.split('-')[1]}! Please confirm the appointment time.`,
-            `/bc/dashboard/recommendations/${token}`
-          );
-          
-          // Notify Doctor
-          const { data: bcProf } = await supabaseAdmin.from('blood_collector').select('first_name, last_name').eq('id', appData.bc_id).single();
-          const bcName = bcProf ? `${bcProf.first_name} ${bcProf.last_name}` : 'A collector';
-          await createNotification(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!,
-            appData.case.doctor_id,
-            'case_update',
-            'Collector Selected',
-            `Patient has selected ${bcName} for recommendation ${token.split('-')[1]}.`,
-            `/dashboard/recommendations/${token}`
-          );
+ let test_costs_total = 0;
+ let highestShippingLabel = 'standard';
+ const preanalyticsList: string[] = [];
 
-          // Webhook `recommendation.bc_selected` Integration
-          await deliverWebhook(appData.case.doctor_id, 'recommendation.bc_selected', { 
-             recommendationId: token,
-             bcId: appData.bc_id,
-             bcName: bcName
-          });
-        } catch (err) {
-          console.error('[Async Side Effects Failed]', err);
-        }
-      })();
-      // --- End Fire-and-forget ---
+ (recData.items || []).forEach((item: any) => {
+ test_costs_total += Number(item.unit_price || 0) * Number(item.quantity || 1);
+ 
+ const shipMode = item.test?.sample_shipping || 'standard';
+ if (SHIPPING_RANK[shipMode] > SHIPPING_RANK[highestShippingLabel]) {
+ highestShippingLabel = shipMode;
+ }
+ 
+ if (item.test?.preanalytics && !preanalyticsList.includes(item.test.preanalytics)) {
+ preanalyticsList.push(item.test.preanalytics);
+ }
+ });
 
-      return NextResponse.json({ success: true });
-    }
+ const shipping_estimate = SHIPPING_COSTS[highestShippingLabel] || 0;
+ const service_fee = test_costs_total * (serviceFeePct / 100);
+ const subtotal = test_costs_total + service_fee + shipping_estimate;
+ const vat = (service_fee + shipping_estimate) * 0.19;
+ const total_amount = subtotal + vat;
 
-    if (action === 'submit_rating') {
-      const { reviewData } = payload;
-      const { error } = await supabaseAdmin.from('review').insert(reviewData);
-      if (error) throw error;
-      
-      // Update recommendation to indicate it's ready for payment
-      // e.g. status: 'pending_payment' or just keep 'completed' since 'completed' implies payment ready.
-      // But let's check what the standard status is. Based on schema: created, matched, pending_booking, booked, completed, cancelled.
-      // So 'completed' is the final end state for the collection. Payment then kicks in.
-      const { error: recommendationErr } = await supabaseAdmin.from('recommendation').update({ status: 'completed' }).eq('id', token);
-      if (recommendationErr) throw recommendationErr;
+ const pricing = {
+ test_costs_total,
+ service_fee_pct: serviceFeePct,
+ service_fee,
+ shipping_estimate,
+ subtotal,
+ vat,
+ total_amount
+ };
 
-      return NextResponse.json({ success: true });
-    }
+ const { data: order, error: orderError } = await supabaseAdmin
+ .from('tt_order')
+ .select('*')
+ .eq('recommendation_id', recData.id)
+ .maybeSingle();
 
-    if (action === 'schedule_time') {
-      const { bcId, patientId, time, selectedApplicationId } = payload;
-      
-      // Also trigger the acceptance logic if passed, but typically select_bc does the heavy lifting first or concurrently.
-      // If we do it concurrently:
-      if (selectedApplicationId) {
-         // Update accepted status implicitly by falling back 
-         await supabaseAdmin.from('case_application').update({ status: 'accepted' }).eq('id', selectedApplicationId);
-      }
-      
-      await supabaseAdmin.from('recommendation').update({ status: 'matched' }).eq('id', token);
-
-      const { error } = await supabaseAdmin.from('appointment').insert({
-        recommendation_id: token,
-        bc_id: bcId,
-        patient_id: patientId,
-        scheduled_at: time,
-        status: 'scheduled'
-      });
-      if (error) throw error;
-      return NextResponse.json({ success: true });
-    }
-
-    if (action === 'request_custom_time') {
-      const { bcId, patientId, time, notes, selectedApplicationId } = payload;
-      
-      if (selectedApplicationId) {
-         await supabaseAdmin.from('case_application').update({ status: 'accepted' }).eq('id', selectedApplicationId);
-      }
-      
-      await supabaseAdmin.from('recommendation').update({ status: 'matched' }).eq('id', token);
-
-      const { error } = await supabaseAdmin.from('appointment').insert({
-        recommendation_id: token,
-        bc_id: bcId,
-        patient_id: patientId,
-        scheduled_at: time,
-        status: 'pending_bc_confirmation',
-        notes: notes
-      });
-      if (error) throw error;
-      return NextResponse.json({ success: true });
-    }
-
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+ return NextResponse.json({
+ recommendation: recData,
+ pricing,
+ preanalytics: preanalyticsList,
+ order: order || null
+ });
+ } catch (error: any) {
+ return NextResponse.json({ error: error.message }, { status: 500 });
+ }
 }

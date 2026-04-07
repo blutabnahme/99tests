@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { createNotification } from '@/lib/notifications';
+import { sendNotification } from '@/lib/notifications';
 import { paymentProvider } from '@/lib/payments';
 import { deliverWebhook } from '@/lib/webhooks';
 
@@ -117,40 +117,44 @@ export async function cancelAppointmentTransaction(appointmentId: string, cancel
 
   // 6. Notifications
   if (initiator === 'patient') {
-    await createNotification(
-      url, scKey, appt.bc_id as string,
-      'system_alert', 'Patient Cancelled Appointment',
-      `The patient cancelled the appointment for Recommendation ${cObj?.id}. Reason: ${cancellationReason}`,
-      `/bc/appointments`
-    );
+    await sendNotification({
+      userId: appt.bc_id as string,
+      notificationType: 'system_alert',
+      title: 'Patient Cancelled Appointment',
+      message: `The patient cancelled the appointment for Recommendation ${cObj?.id}. Reason: ${cancellationReason}`,
+      metadata: { route: `/bc/appointments` }
+    });
   }
 
   if (initiator === 'bc') {
      if (cObj?.doctor_id) {
-       await createNotification(
-         url, scKey, cObj.doctor_id,
-         'case_update', 'Appointment Cancelled',
-         `The collector cancelled the appointment for recommendation ${cObj.id.split('-')[1]}. Reason: ${cancellationReason}`,
-         `/dashboard/recommendations`
-       );
+       await sendNotification({
+         userId: cObj.doctor_id,
+         notificationType: 'case_update',
+         title: 'Appointment Cancelled',
+         message: `The collector cancelled the appointment for recommendation ${cObj.id.split('-')[1]}. Reason: ${cancellationReason}`,
+         metadata: { route: `/dashboard/recommendations` }
+       });
      }
-     await createNotification(
-       url, scKey, cObj?.patient_id as string,
-       'case_update', 'Appointment Cancelled',
-       `Your appointment was cancelled by the collector. A refund has been initiated.`,
-       `/patient/${cObj?.id}`
-     );
+     await sendNotification({
+       userId: cObj?.patient_id as string,
+       notificationType: 'case_update',
+       title: 'Appointment Cancelled',
+       message: `Your appointment was cancelled by the collector. A refund has been initiated.`,
+       metadata: { route: `/patient/${cObj?.id}` }
+     });
   }
   
   // Custom API Integration hook (notify patient admin initiated an API voiding)
   if (initiator === 'admin') {
      if (cObj?.patient_id) {
-       await createNotification(
-         url, scKey, cObj.patient_id as string,
-         'case_update', 'Recommendation Voided',
-         `Your Healthcare Provider directly cancelled Recommendation ${cObj.id.split('-')[1]}. Total refunds processed automatically.`,
-         `/patient/${cObj?.id}`
-       );
+       await sendNotification({
+         userId: cObj.patient_id as string,
+         notificationType: 'case_update',
+         title: 'Recommendation Voided',
+         message: `Your Healthcare Provider directly cancelled Recommendation ${cObj.id.split('-')[1]}. Total refunds processed automatically.`,
+         metadata: { route: `/patient/${cObj?.id}` }
+       });
      }
   }
 

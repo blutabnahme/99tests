@@ -61,7 +61,7 @@ export async function middleware(req: NextRequest) {
   const path = url.pathname;
 
   if (!user) {
-    if (path.startsWith('/bc') || path.startsWith('/admin')) {
+    if (path.startsWith('/bc') || path.startsWith('/admin') || path.startsWith('/dashboard')) {
       url.pathname = '/login';
       return NextResponse.redirect(url);
     }
@@ -81,11 +81,11 @@ export async function middleware(req: NextRequest) {
   }
 
   if (path === '/login' || path.startsWith('/register')) {
-    if (userRole === 'healthcare_company') url.pathname = '/dashboard';
+    if (userRole === 'admin') url.pathname = '/admin';
     else if (userRole === 'blood_collector') url.pathname = '/bc';
+    else if (userRole === 'doctor' || userRole === 'doctor_practice' || userRole === 'healthcare_company') url.pathname = '/dashboard';
     else if (userRole === 'patient') url.pathname = '/patient';
-    else if (userRole === 'admin') url.pathname = '/admin';
-    else url.pathname = '/';
+    else url.pathname = '/dashboard';
     return NextResponse.redirect(url);
   }
 

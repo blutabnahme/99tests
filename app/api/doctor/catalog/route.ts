@@ -1,60 +1,64 @@
-export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
-  try {
-    const supabaseClient = createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+  const { searchParams } = new URL(request.url);
+  const page = parseInt(searchParams.get('page') || '1');
+  const limit = parseInt(searchParams.get('limit') || '25');
+  const search = searchParams.get('search') || '';
+  const type = searchParams.get('type') || '';
+  const labId = searchParams.get('lab_id') || '';
+  const favoritesOnly = searchParams.get('favorites_only') === 'true';
 
-    if (authError || !user || user.user_metadata?.role !== 'doctor') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const offset = (page - 1) * limit;
 
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1', 10);
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const type = searchParams.get('type');
-    const category = searchParams.get('category');
-    const lab_id = searchParams.get('lab_id');
-    const search = searchParams.get('search');
+  let query = supabaseAdmin
+    .from('tt_test_catalog')
+    .select('*, laboratory:tt_laboratory(name)', { count: 'exact' })
+    .eq('is_active', true);
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+  const sort = searchParams.get('sort') || 'name';
 
-    let query = supabaseAdmin.from('tt_test_catalog').select(`*, lab:lab_id(name)`, { count: 'exact' }).eq('is_active', true);
+  if (sort === 'newest') {
+    query = query.order('created_at', { ascending: false });
+  } else {
+    query = query.order('name');
+  }
 
-    if (type && type.toLowerCase() !== 'all') {
-      query = query.eq('type', type.toLowerCase());
-    }
-    if (category && category !== 'all') {
-      query = query.eq('category', category);
-    }
-    if (lab_id && lab_id !== 'all') {
-      query = query.eq('lab_id', lab_id);
-    }
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
-    }
+  if (search) {
+    query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`);
+  }
+  if (type && type !== 'all') {
+    query = query.eq('type', type);
+  }
+  if (labId && labId !== 'all') {
+    query = query.eq('laboratory_id', labId);
+  }
 
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
+  // TODO: If favoritesOnly, filter by doctor's favorites
+  // This requires knowing the doctor's ID from auth
+  // For now, return all and let frontend filter
 
-    const { data, count, error } = await query.order('name', { ascending: true }).range(from, to);
+  query = query.range(offset, offset + limit - 1);
 
-    if (error) throw error;
+  const { data, count, error } = await query;
 
-    return NextResponse.json({
-      data: data || [],
-      total: count || 0,
-      page,
-      limit
-    });
-  } catch (error: any) {
-    console.error("GET doctor catalog error:", error);
+  if (error) {
+    console.error('Catalog API error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  return NextResponse.json({
+    data: data || [],
+    total: count || 0,
+    page,
+    limit,
+  });
 }

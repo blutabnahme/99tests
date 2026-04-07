@@ -17,19 +17,51 @@ import {
   Euro,
   BarChart3,
   Settings,
-  HelpCircle
+  HelpCircle,
+  FileOutput,
+  Receipt,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTranslations } from 'next-intl';
 
+// ============================================================
+// TYPES
+// ============================================================
+
+interface SidebarItem {
+  icon: any;
+  label: string;
+  href: string;
+  badge?: number;
+}
+
+interface SidebarGroup {
+  id: string;
+  label: string;
+  icon: any;
+  children: SidebarItem[];
+}
+
+type SidebarEntry = SidebarItem | SidebarGroup;
+
+function isGroup(entry: SidebarEntry): entry is SidebarGroup {
+  return 'children' in entry;
+}
+
+// ============================================================
+// COMPONENT
+// ============================================================
+
 export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [hover, setHover] = useState<number | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [userProfile, setUserProfile] = useState<{ name: string, email: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
   const { unreadCount } = useNotifications();
   const t = useTranslations('nav');
 
@@ -51,71 +83,211 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
     router.push("/login");
   };
 
-  const items = [
+  // ============================================================
+  // SIDEBAR STRUCTURE
+  // ============================================================
+
+  const entries: SidebarEntry[] = [
+    // Ungrouped top-level items
     { icon: LayoutDashboard, label: t('overview'), href: "/admin" },
-    { icon: FlaskConical, label: "Test Catalog", href: "/admin/catalog" },
-    { icon: Building2, label: "Laboratories", href: "/admin/laboratories" },
-    { icon: Package, label: "Materials", href: "/admin/materials" },
+    { icon: Bell, label: t('notifications'), href: "/admin/notifications", badge: unreadCount },
     { icon: ClipboardList, label: "Recommendations", href: "/admin/recommendations" },
     { icon: ShoppingCart, label: "Orders", href: "/admin/orders" },
-    { icon: Users, label: t('users'), href: "/admin/users" },
-    { icon: Euro, label: t('financial'), href: "/admin/financial" },
-    { icon: BarChart3, label: t('insights'), href: "/admin/insights" },
-    { icon: Settings, label: t('configuration'), href: "/admin/config" },
-    { icon: Bell, label: t('notifications'), href: "/admin/notifications", badge: unreadCount },
-    { icon: HelpCircle, label: "FAQ", href: "/admin/faq" },
+    { icon: ShieldCheck, label: "Verifications", href: "/admin/verifications" },
+
+    // Tests group
+    {
+      id: 'tests',
+      label: 'Tests',
+      icon: FlaskConical,
+      children: [
+        { icon: FlaskConical, label: "Catalog", href: "/admin/catalog" },
+        { icon: Building2, label: "Laboratories", href: "/admin/laboratories" },
+        { icon: Package, label: "Materials", href: "/admin/materials" },
+      ],
+    },
+
+    // Exports group
+    {
+      id: 'exports',
+      label: 'Exports',
+      icon: FileOutput,
+      children: [
+        { icon: FileOutput, label: "PAD Export", href: "/admin/exports/pad" },
+        { icon: Receipt, label: "Doctor Invoices", href: "/admin/invoices" },
+      ],
+    },
+
+    // Analytics group
+    {
+      id: 'analytics',
+      label: t('insights'),
+      icon: BarChart3,
+      children: [
+        { icon: Euro, label: t('financial'), href: "/admin/financial" },
+        { icon: BarChart3, label: t('insights'), href: "/admin/insights" },
+      ],
+    },
+
+    // Management group
+    {
+      id: 'management',
+      label: 'Management',
+      icon: Settings,
+      children: [
+        { icon: Users, label: t('users'), href: "/admin/users" },
+        { icon: Settings, label: t('configuration'), href: "/admin/config" },
+        { icon: HelpCircle, label: "FAQ", href: "/admin/faq" },
+      ],
+    },
   ];
+
+  // ============================================================
+  // COLLAPSED STATE — auto-expand groups with active child
+  // ============================================================
+
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  // On mount + pathname change: expand groups that contain the active route
+  useEffect(() => {
+    const newCollapsed: Record<string, boolean> = {};
+    for (const entry of entries) {
+      if (isGroup(entry)) {
+        const hasActiveChild = entry.children.some(
+          child => pathname === child.href || pathname.startsWith(child.href + '/')
+        );
+        // If a child is active, force expand. Otherwise keep current state.
+        if (hasActiveChild) {
+          newCollapsed[entry.id] = false;
+        } else if (collapsed[entry.id] === undefined) {
+          // Default: collapsed
+          newCollapsed[entry.id] = true;
+        } else {
+          newCollapsed[entry.id] = collapsed[entry.id];
+        }
+      }
+    }
+    setCollapsed(prev => ({ ...prev, ...newCollapsed }));
+  }, [pathname]);
+
+  const toggleGroup = (id: string) => {
+    setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // ============================================================
+  // RENDER HELPERS
+  // ============================================================
+
+  const renderItem = (item: SidebarItem, isChild: boolean = false) => {
+    const Icon = item.icon;
+    const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
+    const hoverKey = item.href;
+    const isHovered = hover === hoverKey;
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={() => onNavigate?.()}
+        onMouseEnter={() => setHover(hoverKey)}
+        onMouseLeave={() => setHover(null)}
+        className={`flex items-center gap-3 px-4 py-2 rounded-[6px] transition-colors duration-150 font-body text-[14px] font-medium ${
+          isChild ? 'pl-11' : ''
+        } ${
+          isActive
+            ? "bg-[#008085]/[0.06] text-[#008085]"
+            : isHovered
+            ? "bg-[#008085]/[0.03] text-[#008085]"
+            : "text-[#6E7280] bg-transparent"
+        }`}
+      >
+        {!isChild && (
+          <Icon
+            className={`w-5 h-5 shrink-0 ${isActive ? "text-[#008085]" : "text-[#6E7280] transition-colors"}`}
+            strokeWidth={2}
+          />
+        )}
+        <div className="flex items-center gap-2 flex-1">
+          <span>{item.label}</span>
+          {item.badge !== undefined && item.badge > 0 && (
+            <span className="flex items-center justify-center bg-red-500 text-white text-[11px] font-bold h-5 min-w-[20px] rounded-full px-1.5 shrink-0">
+              {item.badge}
+            </span>
+          )}
+        </div>
+      </Link>
+    );
+  };
+
+  const renderGroup = (group: SidebarGroup) => {
+    const Icon = group.icon;
+    const isOpen = !collapsed[group.id];
+    const hasActiveChild = group.children.some(
+      child => pathname === child.href || pathname.startsWith(child.href + '/')
+    );
+    const isHovered = hover === `group-${group.id}`;
+
+    return (
+      <div key={group.id}>
+        {/* Group header */}
+        <button
+          onClick={() => toggleGroup(group.id)}
+          onMouseEnter={() => setHover(`group-${group.id}`)}
+          onMouseLeave={() => setHover(null)}
+          className={`w-full flex items-center gap-3 px-4 py-2 rounded-[6px] transition-colors duration-150 font-body text-[14px] font-medium ${
+            hasActiveChild
+              ? "text-[#008085]"
+              : isHovered
+              ? "bg-[#008085]/[0.03] text-[#008085]"
+              : "text-[#6E7280] bg-transparent"
+          }`}
+        >
+          <Icon
+            className={`w-5 h-5 shrink-0 ${hasActiveChild ? "text-[#008085]" : "text-[#6E7280] transition-colors"}`}
+            strokeWidth={2}
+          />
+          <span className="flex-1 text-left">{group.label}</span>
+          {isOpen ? (
+            <ChevronDown className="w-4 h-4 text-[#9CA3AF] shrink-0" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-[#9CA3AF] shrink-0" />
+          )}
+        </button>
+
+        {/* Children */}
+        {isOpen && (
+          <div className="mt-0.5 space-y-0.5">
+            {group.children.map(child => renderItem(child, true))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   return (
     <aside className="w-full lg:w-[260px] bg-white lg:border-r border-gray-200 flex flex-col shrink-0 h-full lg:h-screen lg:sticky lg:top-0">
+      {/* Logo */}
       <div className="hidden lg:flex p-6 pb-4 mb-3 items-center justify-between">
         <div className="flex items-center gap-2.5">
           <img src="/logo.svg" alt="99Tests" className="h-6 w-auto" />
         </div>
       </div>
-      
 
-
+      {/* Navigation */}
       <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto py-2 pt-0 lg:pt-2">
-        {items.map((item, i) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
-          const isHovered = hover === i;
-
-          return (
-            <Link
-              key={i}
-              href={item.href}
-              onClick={() => onNavigate?.()}
-              onMouseEnter={() => setHover(i)}
-              onMouseLeave={() => setHover(null)}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-[6px] transition-all duration-150 font-body text-[14px] font-medium ${
-                isActive 
-                  ? "bg-[#008085]/[0.06] text-[#008085]" 
-                  : isHovered 
-                    ? "bg-[#008085]/[0.03] text-[#008085]" 
-                    : "text-[#6E7280] bg-transparent"
-              }`}
-            >
-              <Icon 
-                className={`w-5 h-5 ${isActive ? "text-[#008085]" : "text-[#6E7280] transition-colors"}`} 
-                strokeWidth={2}
-              />
-              <div className="flex items-center gap-2 flex-1">
-                <span>
-                  {item.label}
-                </span>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span className="flex items-center justify-center bg-red-500 text-white text-[11px] font-bold h-5 min-w-[20px] rounded-full px-1.5 shrink-0">
-                    {item.badge}
-                  </span>
-                )}
-              </div>
-            </Link>
-          );
+        {entries.map((entry, i) => {
+          if (isGroup(entry)) {
+            return renderGroup(entry);
+          }
+          return renderItem(entry);
         })}
       </nav>
 
+      {/* Footer */}
       <div className="p-4 border-t border-gray-100 mt-auto shrink-0">
         <div className="flex items-center gap-3 px-4 py-2.5 mb-2">
           <div className="w-9 h-9 rounded-full bg-open-bg flex items-center justify-center shrink-0">

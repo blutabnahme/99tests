@@ -1,49 +1,63 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
-// Make sure to use the service role key for backend operations if required,
-// but for simple create operations, the standard client might suffice if called directly,
-// however we will define this helper to accept a generic supabase client so it can be 
-// used in both Route Handlers and Server Actions
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-export type NotificationType = 
-  | 'new_opportunity'
-  | 'application_received'
-  | 'application_accepted'
-  | 'application_rejected'
-  | 'case_update'
-  | 'shortlist_ready'
-  | 'appointment_reminder'
-  | 'payment_received'
-  | 'system_alert';
+interface SendNotificationParams {
+  userId: string;
+  title: string;
+  message: string;
+  notificationType: string;
+  referenceId?: string;
+  referenceType?: string;
+  metadata?: Record<string, any>;
+}
 
-export async function createNotification(
-  supabaseUrl: string,
-  supabaseKey: string,
-  userId: string,
-  type: NotificationType,
-  title: string,
-  message: string,
-  link?: string
-) {
-  const supabase = createClient(supabaseUrl, supabaseKey);
-  
-  const { data, error } = await supabase
-    .from('notifications')
+export async function sendNotification(params: SendNotificationParams) {
+  // Check if user has this notification type enabled
+  const { data: pref } = await supabaseAdmin
+    .from('tt_notification_preference')
+    .select('enabled')
+    .eq('user_id', params.userId)
+    .eq('notification_type', params.notificationType)
+    .maybeSingle();
+
+  // If preference exists and is disabled, skip
+  if (pref && !pref.enabled) return null;
+
+  // Create notification
+  const { data, error } = await supabaseAdmin
+    .from('tt_notification')
     .insert({
-      user_id: userId,
-      type,
-      title,
-      message,
-      link: link || null,
-      read: false
+      user_id: params.userId,
+      type: params.notificationType,
+      title: params.title,
+      message: params.message,
+      notification_type: params.notificationType,
+      reference_id: params.referenceId || null,
+      reference_type: params.referenceType || null,
+      metadata: params.metadata || {},
+      is_read: false,
     })
     .select()
     .single();
 
   if (error) {
-    console.error('Error creating notification:', error);
-    throw new Error(error.message);
+    console.error('[NOTIFICATION] Failed to create:', error);
+    return null;
   }
 
   return data;
+}
+
+export async function getAdminUserIds(): Promise<string[]> {
+  const { data } = await supabaseAdmin.auth.admin.listUsers();
+  if (data?.users) {
+    return data.users
+      .filter(u => u.user_metadata?.role === 'admin')
+      .map(u => u.id);
+  }
+  return [];
 }

@@ -10,51 +10,55 @@ import { BCSidebar } from '@/components/dashboard/BCSidebar';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 
 interface MobileLayoutWrapperProps {
-  sidebarType: 'hc' | 'bc' | 'admin';
-  children: React.ReactNode;
+ sidebarType: 'hc' | 'bc' | 'admin';
+ children: React.ReactNode;
 }
 
 const sidebars = {
-  hc: DoctorSidebar,
-  bc: BCSidebar,
-  admin: AdminSidebar,
+ hc: DoctorSidebar,
+ bc: BCSidebar,
+ admin: AdminSidebar,
 };
 
 export default function MobileLayoutWrapper({ sidebarType, children }: MobileLayoutWrapperProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const pathname = usePathname() || '';
-  const handleMenuToggle = useCallback(() => setSidebarOpen(prev => !prev), []);
-  const handleClose = useCallback(() => setSidebarOpen(false), []);
+ const [sidebarOpen, setSidebarOpen] = useState(false);
+ const pathname = usePathname() || '';
+ const handleMenuToggle = useCallback(() => setSidebarOpen(prev => !prev), []);
+ const handleClose = useCallback(() => setSidebarOpen(false), []);
 
-  const SidebarComponent = sidebars[sidebarType];
+ const SidebarComponent = sidebars[sidebarType];
 
-  if (pathname.includes('/recommendations/new')) {
-    return (
-      <div className="flex flex-col min-h-screen bg-[#F7F7F8] font-body text-near-black">
+ const isRecommendationWizard = pathname.includes('/recommendations/new') || (pathname.includes('/recommendations/') && pathname.includes('/edit'));
 
-        <main className="flex-1 w-full bg-[#F7F7F8]">
-          {children}
-        </main>
-      </div>
-    );
-  }
+ if (isRecommendationWizard) {
+ return (
+ <div className="flex flex-col min-h-screen bg-[#F7F7F8] font-body text-near-black">
 
-  return (
-    <div className="flex min-h-screen bg-[#F7F7F8] font-body text-near-black">
-      <div className="desktop-sidebar">
-        <SidebarComponent />
-      </div>
+ <main className="flex-1 w-full bg-[#F7F7F8]">
+ {children}
+ </main>
+ </div>
+ );
+ }
 
-      <MobileSidebar isOpen={sidebarOpen} onClose={handleClose}>
-        <SidebarComponent onNavigate={handleClose} />
-      </MobileSidebar>
+ return (
+ <div className="flex min-h-screen bg-[#F7F7F8] font-body text-near-black">
+ <div className="desktop-sidebar">
+ <SidebarComponent />
+ </div>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <MobileHeader onMenuToggle={handleMenuToggle} isOpen={sidebarOpen} />
-        <main className="flex-1 p-6 lg:p-8 xl:p-12 overflow-x-hidden">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
+ <MobileSidebar isOpen={sidebarOpen} onClose={handleClose}>
+ <SidebarComponent onNavigate={handleClose} />
+ </MobileSidebar>
+
+ <div className="flex-1 flex flex-col min-w-0">
+ <MobileHeader onMenuToggle={handleMenuToggle} isOpen={sidebarOpen} />
+ <main className="flex-1 p-6 lg:p-8 xl:p-12 overflow-x-hidden">
+  <div className="max-w-7xl mx-auto">
+   {children}
+  </div>
+ </main>
+ </div>
+ </div>
+ );
 }
