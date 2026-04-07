@@ -195,7 +195,7 @@ export async function POST(request: Request) {
  const testIds = items.map(i => i.test_id);
  const { data: catalogTests, error: testsError } = await supabaseAdmin
  .from('tt_test_catalog')
- .select('id, name, sku, type, sample_shipping, lab_cost, price_insured, price_uninsured, price_zone1, price_zone2, price_zone3')
+ .select('id, name, sku, type, sample_shipping, lab_cost, lab_id, price_insured, price_uninsured, price_zone1, price_zone2, price_zone3')
  .in('id', testIds);
 
  if (testsError) throw testsError;
@@ -227,7 +227,8 @@ export async function POST(request: Request) {
  test_type: catalogTest.type,
  quantity: 1,
  unit_price: unit_price,
- lab_cost: catalogTest.lab_cost || 0
+ lab_cost: catalogTest.lab_cost || 0,
+ lab_id: catalogTest.lab_id || null,
  };
  });
 
