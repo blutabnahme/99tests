@@ -7,7 +7,8 @@ import Link from 'next/link';
 import {
   Loader2, ArrowLeft, CheckCircle2, Clock, AlertCircle, XCircle,
   Package, FileText, FileCode, Receipt, Truck,
-  Download, RefreshCw, User, Stethoscope, CreditCard, MapPin
+  Download, RefreshCw, User, Stethoscope, CreditCard, MapPin,
+  ChevronDown, ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -49,6 +50,11 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [error, setError] = useState('');
   const [confirmingPayment, setConfirmingPayment] = useState(false);
   const [rerunningPipeline, setRerunningPipeline] = useState(false);
+  const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
+
+  const toggleStep = (key: string) => {
+    setExpandedSteps(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const fetchOrder = async () => {
     setLoading(true);
@@ -196,32 +202,92 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                   const s = prepStatus[step.key];
                   const StepIcon = step.icon;
                   return (
-                    <div key={step.key} className="flex items-center gap-4 p-3 rounded-[12px] bg-gray-50/50 border border-gray-100">
-                      <div className="w-10 h-10 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0">
-                        <StepIcon className="w-5 h-5 text-gray-500" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[14px] font-medium text-near-black">{step.label}</span>
-                          <StepStatusIcon status={s?.status || 'pending'} />
+                    <div key={step.key} className="border border-gray-100 rounded-[8px] overflow-hidden bg-white hover:border-gray-300 transition-colors">
+                      <div 
+                        onClick={() => toggleStep(step.key)}
+                        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0">
+                          <StepIcon className="w-4 h-4 text-gray-500" />
                         </div>
-                        <p className="text-[12px] text-gray-500">
-                          {s?.status === 'completed' && s.completed_at ? `Completed ${formatDate(s.completed_at)}` :
-                           s?.status === 'failed' ? `Failed: ${s.error || 'Unknown error'}` :
-                           s?.status === 'skipped' ? `Skipped: ${s.note || ''}` :
-                           step.description}
-                        </p>
-                        {/* Extra info per step */}
-                        {step.key === 'materials' && s?.material_count != null && (
-                          <span className="text-[11px] text-gray-400">{s.material_count} material(s)</span>
-                        )}
-                        {step.key === 'anamnese_pdf' && s?.file_count != null && (
-                          <span className="text-[11px] text-gray-400">{s.file_count} PDF(s) generated</span>
-                        )}
-                        {step.key === 'dhl_label' && s?.mock && (
-                          <span className="text-[11px] text-amber-500 font-medium">Mock tracking numbers</span>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-heading font-medium text-[14px] text-near-black">{step.label}</span>
+                            <StepStatusIcon status={s?.status || 'pending'} />
+                          </div>
+                          <p className="text-[12px] text-gray-400 truncate flex items-center gap-2">
+                            <span>
+                              {s?.status === 'completed' && s.completed_at ? `Completed ${formatDate(s.completed_at)}` :
+                               s?.status === 'failed' ? `Failed: ${s.error || 'Unknown error'}` :
+                               s?.status === 'skipped' ? `Skipped: ${s.note || ''}` :
+                               step.description}
+                            </span>
+                            {step.key === 'materials' && s?.material_count != null && (
+                              <span className="text-[11px] text-gray-400 border-l border-gray-200 pl-2">{s.material_count} material(s)</span>
+                            )}
+                            {step.key === 'anamnese_pdf' && s?.file_count != null && (
+                              <span className="text-[11px] text-gray-400 border-l border-gray-200 pl-2">{s.file_count} PDF(s)</span>
+                            )}
+                            {step.key === 'dhl_label' && s?.mock && (
+                              <span className="text-[11px] text-amber-500 font-medium border-l border-gray-200 pl-2">Mock tracking</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0 ml-2">
+                          {expandedSteps[step.key]
+                            ? <ChevronDown className="w-4 h-4 text-gray-300" />
+                            : <ChevronRight className="w-4 h-4 text-gray-300" />
+                          }
+                        </div>
                       </div>
+                      
+                      {expandedSteps[step.key] && s && (
+                        <div className="px-4 pb-3 border-t border-gray-100">
+                          <div className="bg-gray-50 rounded-[8px] p-3 mt-2 font-mono text-[12px] text-gray-600 space-y-1.5">
+                            {s.status && (
+                              <div className="flex justify-between gap-2">
+                                <span className="text-gray-400 flex-shrink-0">status</span>
+                                <span className={s.status === 'completed' ? 'text-green-600' : s.status === 'failed' ? 'text-red-500' : 'text-gray-500'}>
+                                  {s.status}
+                                </span>
+                              </div>
+                            )}
+                            {s.attempted_at && (
+                              <div className="flex justify-between gap-2">
+                                <span className="text-gray-400 flex-shrink-0">attempted</span>
+                                <span>{new Date(s.attempted_at).toLocaleString('de-DE')}</span>
+                              </div>
+                            )}
+                            {s.completed_at && (
+                              <div className="flex justify-between gap-2">
+                                <span className="text-gray-400 flex-shrink-0">completed</span>
+                                <span>{new Date(s.completed_at).toLocaleString('de-DE')}</span>
+                              </div>
+                            )}
+                            {s.error && (
+                              <div className="flex justify-between gap-2">
+                                <span className="text-gray-400 flex-shrink-0">error</span>
+                                <span className="text-red-500 text-right">{s.error}</span>
+                              </div>
+                            )}
+                            {Object.entries(s)
+                              .filter(([k]) => !['status', 'attempted_at', 'completed_at', 'error'].includes(k))
+                              .map(([key, value]) => (
+                                <div key={key} className="flex justify-between gap-2">
+                                  <span className="text-gray-400 flex-shrink-0">{key.replace(/_/g, ' ')}</span>
+                                  <span className="text-right break-all max-w-[70%]">
+                                    {Array.isArray(value)
+                                      ? value.join(', ')
+                                      : typeof value === 'object'
+                                      ? JSON.stringify(value)
+                                      : String(value)}
+                                  </span>
+                                </div>
+                              ))
+                            }
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
