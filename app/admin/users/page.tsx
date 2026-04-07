@@ -2,11 +2,12 @@
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Loader2, Search, Users, User, Stethoscope, ChevronDown, X } from 'lucide-react';
+import { Loader2, Search, Users, User, Stethoscope, ChevronDown, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import DoctorEditModal from '@/components/admin/DoctorEditModal';
 import PatientEditModal from '@/components/admin/PatientEditModal';
 import UserActionsDropdown from '@/components/admin/UserActionsDropdown';
+import { CreateUserModal } from './CreateUserModal';
 
 function SortableHeader({ label, sortKey, currentSort, onSort }: {
   label: string; sortKey: string; currentSort: string; onSort: (key: string) => void;
@@ -146,6 +147,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const limit = 25;
@@ -235,9 +237,14 @@ export default function AdminUsersPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-6 lg:space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="font-heading font-medium text-[24px] lg:text-[28px] text-near-black tracking-tight">Users</h1>
-        <p className="text-gray-500 text-[14px] mt-1">Manage doctors and patients on the platform</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-heading font-medium text-[24px] lg:text-[28px] text-near-black tracking-tight">Users</h1>
+          <p className="text-gray-500 text-[14px] mt-1">Manage doctors and patients on the platform</p>
+        </div>
+        <button onClick={() => setShowCreateModal(true)} className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-full text-[14px] font-semibold transition-all shadow-sm shrink-0">
+          <Plus className="w-4 h-4" /> New User
+        </button>
       </div>
 
       {/* Tabs */}
@@ -451,6 +458,7 @@ export default function AdminUsersPage() {
 
       {editingDoctor && <DoctorEditModal doctor={editingDoctor} onClose={() => setEditingDoctor(null)} onSuccess={() => { setEditingDoctor(null); fetchUsers(); }} />}
       {editingPatient && <PatientEditModal patient={editingPatient} onClose={() => setEditingPatient(null)} onSuccess={() => { setEditingPatient(null); fetchUsers(); }} />}
+      {showCreateModal && <CreateUserModal onClose={() => setShowCreateModal(false)} onSuccess={() => { setShowCreateModal(false); fetchUsers(); }} />}
     </div>
   );
 }

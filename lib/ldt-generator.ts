@@ -482,13 +482,20 @@ export async function generateTiff(
 
   // Render SVG → TIFF (1-bit, Group4, 300 DPI)
   const tiffBuffer = await sharp(Buffer.from(svg))
-    .tiff({
-      compression: 'ccittfax4', // Group4
-      bitdepth: 1,
-      xres: DPI,
-      yres: DPI,
-    })
-    .toBuffer();
+    .png()
+    .toBuffer()
+    .then(pngBuf =>
+      sharp(pngBuf)
+        .grayscale()
+        .threshold(128)
+        .tiff({
+          compression: 'lzw',
+          bitdepth: 1,
+          xres: DPI,
+          yres: DPI,
+        })
+        .toBuffer()
+    );
 
   return tiffBuffer;
 }

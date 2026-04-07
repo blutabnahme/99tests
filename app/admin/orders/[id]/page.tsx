@@ -87,12 +87,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     if (!confirm('Re-run the preparation pipeline for this order? This will recalculate materials and regenerate all files.')) return;
     setRerunningPipeline(true);
     try {
-      const res = await fetch(`/api/admin/recommendations/${order.recommendation_id}/materials`, { method: 'POST' });
-      // For now, re-running the full pipeline isn't exposed via API yet.
-      // This triggers the materials recalculation. Full pipeline rerun can be added later.
-      await fetchOrder();
+      const res = await fetch(`/api/admin/orders/${params.id}/rerun-pipeline`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Pipeline failed');
+      }
+      await fetchOrder(); // Refresh order data to show updated pipeline status
     } catch (err: any) {
-      alert(err.message);
+      alert('Pipeline error: ' + err.message);
     } finally {
       setRerunningPipeline(false);
     }

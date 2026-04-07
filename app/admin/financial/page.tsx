@@ -339,7 +339,7 @@ export default function AdminFinancialPage() {
  ))}
  </div>
  
- <button onClick={exportPDF} className="flex flex-1 sm:flex-none justify-center w-full sm:w-auto items-center gap-2 px-4 py-2 bg-open-bg border border-primary-light text-primary-dark text-[13px] font-semibold rounded-lg hover:bg-primary-light transition-colors shrink-0">
+ <button onClick={exportPDF} className="flex flex-1 sm:flex-none justify-center w-full sm:w-auto items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 text-[13px] font-semibold rounded-lg transition-colors shrink-0">
  <FileText className="w-4 h-4" /> Export PDF
  </button>
  <button onClick={handleGenerateInvoices} disabled={loading} className="flex flex-1 sm:flex-none justify-center w-full sm:w-auto items-center gap-2 px-4 py-2 bg-primary-dark text-white text-[13px] font-semibold rounded-lg hover:bg-primary transition-colors shrink-0 shadow-sm shadow-primary-dark/20">

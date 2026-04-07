@@ -22,7 +22,15 @@ function formatDate(iso: string): string {
 }
 
 function formatPaymentMethod(m: string): string {
-  const map: Record<string, string> = { credit_card: 'Card', card: 'Card', sepa: 'SEPA', bank_transfer: 'Bank' };
+  const map: Record<string, string> = {
+    'doctor_invoice': 'Doctor Invoice',
+    'bank_transfer': 'Bank Transfer', 
+    'bank': 'Bank Transfer',
+    'card': 'Credit Card',
+    'credit_card': 'Credit Card',
+    'sepa': 'SEPA',
+    'mock': 'Mock',
+  };
   return map[m] || m || '-';
 }
 
