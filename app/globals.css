@@ -275,3 +275,12 @@ body {
 input[type="checkbox"] {
   accent-color: #008085;
 }
+
+/* Consistent focus style across all form elements */
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  border-color: #008085 !important;
+  box-shadow: 0 0 0 3px rgba(0, 128, 133, 0.1) !important;
+  outline: none !important;
+}

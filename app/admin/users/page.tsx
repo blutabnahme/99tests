@@ -8,6 +8,7 @@ import DoctorEditModal from '@/components/admin/DoctorEditModal';
 import PatientEditModal from '@/components/admin/PatientEditModal';
 import UserActionsDropdown from '@/components/admin/UserActionsDropdown';
 import { CreateUserModal } from './CreateUserModal';
+import { formatDate } from '@/lib/format-date';
 
 function SortableHeader({ label, sortKey, currentSort, onSort }: {
   label: string; sortKey: string; currentSort: string; onSort: (key: string) => void;
@@ -34,11 +35,7 @@ function SortableHeader({ label, sortKey, currentSort, onSort }: {
   );
 }
 
-function formatDate(iso: string): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
-}
+
 
 function VerificationDot({ status }: { status: string }) {
   const color = status === 'verified' ? 'bg-green-500' : status === 'rejected' ? 'bg-red-500' : 'bg-amber-400';

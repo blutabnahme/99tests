@@ -15,11 +15,7 @@ function formatCurrency(n: number): string {
   return `€${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 }
 
-function formatDate(iso: string): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
-}
+import { formatDate } from '@/lib/format-date';
 
 function formatPaymentMethod(m: string): string {
   const map: Record<string, string> = {
