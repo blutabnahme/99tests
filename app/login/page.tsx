@@ -74,16 +74,16 @@ export default function LoginPage() {
  return (
  <div className="min-h-screen bg-[#F7F7F8] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
  {/* Logo */}
- <div className="sm:mx-auto sm:w-full sm:max-w-md flex justify-center mb-8">
+ <div className="sm:mx-auto sm:w-full sm:max-w-md flex justify-center mb-10">
  <Link href="/" className="flex items-center gap-2">
- <img src="/logo.svg" alt="99Tests" className="h-6 w-auto" />
+ <img src="/logo.svg" alt="99Tests" className="h-7 w-auto" />
  </Link>
  </div>
 
  <div className="sm:mx-auto sm:w-full sm:max-w-md">
- <Card className="p-8 shadow-sm border-gray-200 bg-white rounded-[20px]">
+ <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-8">
  <div className="text-center mb-8">
- <h2 className="font-heading text-2xl font-medium text-near-black">{t('auth.login')}</h2>
+ <h1 className="font-heading font-medium text-[24px] text-near-black text-center mb-2">{t('auth.login')}</h1>
  <p className="mt-2 text-[14px] text-gray-500">{t('auth.loginSub')}</p>
  </div>
 
@@ -109,7 +109,7 @@ export default function LoginPage() {
 
  <form onSubmit={handleLogin} className="space-y-5">
  <div className="space-y-1.5">
- <Label htmlFor="email">{t('auth.email')}</Label>
+ <label htmlFor="email" className="text-[12px] font-medium text-gray-500 uppercase tracking-wider block">{t('auth.email')}</label>
  <Input 
  id="email" 
  type="email" 
@@ -123,7 +123,7 @@ export default function LoginPage() {
  {method === "password" && (
  <div className="space-y-1.5">
  <div className="flex items-center justify-between">
- <Label htmlFor="password">{t('auth.password')}</Label>
+ <label htmlFor="password" className="text-[12px] font-medium text-gray-500 uppercase tracking-wider">{t('auth.password')}</label>
  <a href="#" className="text-[13px] font-semibold text-primary-dark hover:text-primary">
  {t('auth.forgotPassword')}
  </a>
@@ -180,7 +180,7 @@ export default function LoginPage() {
  {t('auth.register')}
  </Link>
  </p>
- </Card>
+ </div>
  </div>
  </div>
  );

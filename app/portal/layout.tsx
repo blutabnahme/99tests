@@ -63,7 +63,15 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F7F7F8] flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!patient && !isAuthPage) {
+    return (
+      <div className="min-h-screen bg-[#F7F7F8] flex items-center justify-center">
         <LoadingSpinner size="lg" />
       </div>
     );
@@ -74,31 +82,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <div className="min-h-screen bg-[#FAFAF9]">
         {/* Top header */}
         <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-          <div className="max-w-5xl mx-auto px-5">
-            {/* Top bar */}
-            <div className="py-3.5 flex items-center justify-between">
-              <Link href="/portal" className="flex items-center">
-                <img src="/logo.svg" alt="99Tests" className="h-6 w-auto" />
-              </Link>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[12px] shrink-0 aspect-square">
-                  {patient?.first_name?.[0]}{patient?.last_name?.[0] || ''}
-                </div>
-                <span className="text-[14px] text-gray-600 hidden sm:block">
-                  {patient?.first_name} {patient?.last_name}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-                  title="Sign out"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Tab navigation */}
-            <nav className="flex gap-1 -mb-px overflow-x-auto">
+          <div className="max-w-5xl mx-auto px-5 h-14 flex items-center gap-8">
+            {/* Logo */}
+            <Link href="/portal" className="flex items-center shrink-0">
+              <img src="/logo.svg" alt="99Tests" className="h-5 w-auto" />
+            </Link>
+            
+            {/* Navigation */}
+            <nav className="flex items-center gap-1 flex-1 overflow-x-auto">
               {NAV_ITEMS.map(item => {
                 const isActive = pathname === item.href || (item.href !== '/portal' && pathname.startsWith(item.href));
                 const Icon = item.icon;
@@ -106,18 +97,35 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors whitespace-nowrap ${
                       isActive
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-gray-500 hover:text-near-black hover:bg-gray-100'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-3.5 h-3.5" />
                     {item.label}
                   </Link>
                 );
               })}
             </nav>
+            
+            {/* User */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-[10px]">
+                {patient?.first_name?.[0]}{patient?.last_name?.[0]}
+              </div>
+              <span className="text-[13px] text-gray-600 hidden sm:inline">
+                {patient?.first_name}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </header>
 

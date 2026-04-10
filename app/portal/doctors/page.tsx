@@ -22,7 +22,7 @@ export default function PortalDoctorsPage() {
     fetchDoctors();
   }, []);
 
-  if (loading) return <div className="flex justify-center py-20"><LoadingSpinner size="md" /></div>;
+  if (loading) return <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>;
 
   return (
     <div>
@@ -35,9 +35,12 @@ export default function PortalDoctorsPage() {
           <p className="text-gray-500 text-[14px]">No linked doctors yet.</p>
         </div>
       ) : (
-        <div className={`grid gap-4 ${doctors.length === 1 ? 'grid-cols-1 max-w-lg' : 'grid-cols-1 md:grid-cols-2'}`}>
+        <div className="grid grid-cols-1 gap-4">
           {doctors.map((doc: any) => {
-            const initials = (doc.full_name || 'DR').split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2);
+            const nameParts = (doc.full_name || '').split(' ');
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts[nameParts.length - 1] || '';
+            const initials = `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
 
             return (
               <div key={doc.id} className="bg-white rounded-[16px] border border-gray-200 shadow-sm overflow-hidden">
@@ -73,11 +76,6 @@ export default function PortalDoctorsPage() {
                   )}
                 </div>
 
-                {/* Footer */}
-                <div className="px-6 py-3 border-t border-gray-100 bg-gray-50/50 text-[12px] text-gray-500 flex items-center gap-2">
-                  <ClipboardList className="w-3.5 h-3.5 text-gray-400" />
-                  {doc.recommendation_count} recommendation{doc.recommendation_count !== 1 ? 's' : ''} on this platform
-                </div>
               </div>
             );
           })}

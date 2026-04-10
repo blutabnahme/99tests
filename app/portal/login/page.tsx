@@ -40,23 +40,21 @@ export default function PortalLoginPage() {
   const isEmail = contact.includes('@');
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9] flex flex-col">
-      {/* Header */}
-      <div className="p-6">
-        <div className="flex items-center">
-          <img src="/logo.svg" alt="99Tests" className="h-6 w-auto" />
-        </div>
+    <div className="min-h-screen bg-[#F7F7F8] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {/* Logo */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-md flex justify-center mb-10">
+        <img src="/logo.svg" alt="99Tests" className="h-7 w-auto" />
       </div>
 
       {/* Login card */}
-      <div className="flex-1 flex items-center justify-center px-5 pb-20">
-        <div className="w-full max-w-[420px]">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-6 space-y-5">
           {!sent ? (
             <>
-              <h1 className="font-heading font-medium text-[28px] text-near-black tracking-tight text-center mb-2">
+              <h1 className="font-heading font-medium text-[24px] text-near-black text-center mb-2">
                 Welcome to your portal
               </h1>
-              <p className="text-gray-500 text-[14px] text-center mb-8">
+              <p className="text-gray-500 text-[14px] text-center mb-10">
                 Enter your email or phone number to receive a login link.
               </p>
 
@@ -67,7 +65,7 @@ export default function PortalLoginPage() {
                 </div>
               )}
 
-              <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-6 space-y-5">
+              <div className="space-y-5">
                 {/* Contact input */}
                 <div>
                   <label className="text-[12px] font-medium text-gray-500 uppercase tracking-wider mb-1.5 block">Email or phone number</label>

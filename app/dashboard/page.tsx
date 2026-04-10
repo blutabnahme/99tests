@@ -3,7 +3,7 @@
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Users, LayoutList, LayoutGrid, Send, CreditCard, Truck, FlaskConical, FileCheck, FileEdit, Clock, ClipboardList, ArrowRight, Syringe } from "lucide-react";
+import { Plus, Users, LayoutList, LayoutGrid, Send, CreditCard, Truck, FlaskConical, FileCheck, FileEdit, Clock, ClipboardList, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useDoctor } from "@/components/providers/DoctorProvider";
@@ -15,7 +15,6 @@ const KANBAN_COLUMNS = [
   { id: 'sent', label: 'Sent', matches: ['sent'], icon: Send, color: 'blue' },
   { id: 'paid', label: 'Paid', matches: ['paid', 'awaiting_payment'], icon: CreditCard, color: 'teal' },
   { id: 'shipped', label: 'Shipped', matches: ['preparing', 'kit_shipped'], icon: Truck, color: 'purple' },
-  { id: 'collecting', label: 'Collecting', matches: ['collection_organized', 'awaiting_collection', 'collecting'], icon: Syringe, color: 'pink' },
   { id: 'at_lab', label: 'At Lab', matches: ['at_lab', 'returning_to_lab'], icon: FlaskConical, color: 'amber' },
   { id: 'results', label: 'Results', matches: ['results_ready', 'completed'], icon: FileCheck, color: 'green' },
 ];
