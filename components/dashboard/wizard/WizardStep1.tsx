@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Search, Plus, User, FileText, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PatientModal } from '@/components/dashboard/PatientModal';
+import { formatDate } from '@/lib/format-date';
 
 export default function WizardStep1({ patient, setPatient, setPricingTier, onNext, urlPatientId }: any) {
  const [searchQuery, setSearchQuery] = useState('');
@@ -109,7 +110,7 @@ export default function WizardStep1({ patient, setPatient, setPricingTier, onNex
  {p.first_name} {p.last_name}
  </div>
  <div className="text-[13px] text-gray-500 mt-0.5">
- DOB: {p.date_of_birth ? new Date(p.date_of_birth).toLocaleDateString() : 'Unknown'} • {p.email || 'No email provided'}
+ DOB: {p.date_of_birth ? formatDate(p.date_of_birth) : 'Unknown'} • {p.email || 'No email provided'}
  </div>
  </div>
  </div>
@@ -143,7 +144,7 @@ export default function WizardStep1({ patient, setPatient, setPricingTier, onNex
  {patient.first_name} {patient.last_name}
  </div>
  <div className="text-[14px] text-gray-600 mt-1 flex items-center gap-3">
- <span>DOB: {new Date(patient.date_of_birth).toLocaleDateString()}</span>
+ <span>DOB: {formatDate(patient.date_of_birth)}</span>
  <span>•</span>
  <span>{patient.email || 'No email provided'}</span>
  </div>

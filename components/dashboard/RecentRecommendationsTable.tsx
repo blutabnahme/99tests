@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 
 import { useState } from "react";
 import { Search, ChevronDown } from "lucide-react";
+import { formatDate } from '@/lib/format-date';
 
 export function RecentCasesTable({ 
  recommendations, 
@@ -104,7 +105,7 @@ export function RecentCasesTable({
  <td className="px-6 py-4 font-body text-[14px] font-normal text-gray-500">{c.testsCount}</td>
  <td className="px-6 py-4 font-body text-[14px] font-normal text-gray-500">€{c.total.toFixed(2)}</td>
  <td className="px-6 py-4 font-body text-[14px] font-normal text-gray-500">
- {new Date(c.created_at).toLocaleDateString()}
+ {formatDate(c.created_at)}
  </td>
  </tr>
  ))}

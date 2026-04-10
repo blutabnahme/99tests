@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { useTranslations } from 'next-intl';
+import { formatDate } from '@/lib/format-date';
 
 interface HCConfirmationBannerProps {
  recommendationId: string;
@@ -109,7 +110,7 @@ export default function HCConfirmationBanner({
  </h3>
  
  <p className="text-[14px] text-amber-800/80 mb-4 max-w-3xl leading-relaxed">
- <strong className="font-bold text-amber-900">{collectorName}</strong> {t('desc', { name: '', date: new Date(collectionDate).toLocaleDateString() }).replace(new Date(collectionDate).toLocaleDateString(), '')} <strong className="font-bold text-amber-900">{new Date(collectionDate).toLocaleDateString()}</strong>.
+ <strong className="font-bold text-amber-900">{collectorName}</strong> {t('desc', { name: '', date: formatDate(collectionDate) }).replace(formatDate(collectionDate), '')} <strong className="font-bold text-amber-900">{formatDate(collectionDate)}</strong>.
  </p>
  
  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-5">

@@ -4,6 +4,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, CheckCheck, Loader2, CreditCard, Truck, FlaskConical, Clock, Search, ArrowRight, UserPlus } from 'lucide-react';
+import { formatDate } from '@/lib/format-date';
 
 const NOTIFICATION_ICONS: Record<string, any> = {
   payment_received: { icon: CreditCard, bg: 'bg-green-50', color: 'text-green-600' },
@@ -31,7 +32,7 @@ function timeAgo(dateStr: string) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDate(date);
 }
 
 export default function NotificationsPage() {

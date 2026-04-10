@@ -6,6 +6,7 @@ import { Plus, Search, MoreHorizontal, User, Calendar, MapPin, Mail, ShieldCheck
 import { PatientModal } from "@/components/dashboard/PatientModal";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatDate } from '@/lib/format-date';
 
 export default function PatientsListPage() {
  const router = useRouter();
@@ -154,7 +155,7 @@ export default function PatientsListPage() {
  <div className="text-[12px] text-gray-500 truncate max-w-[200px] mt-0.5">{p.email || '—'}</div>
  </td>
  <td className="px-5 py-4 font-body text-[13px] text-gray-600">
- {new Date(p.date_of_birth).toLocaleDateString()}
+ {formatDate(p.date_of_birth)}
  </td>
  <td className="px-5 py-4 font-body text-[13px] text-gray-600">
  {p.gender === 'M' ? 'Male' : p.gender === 'W' ? 'Female' : 'Diverse'}
@@ -201,7 +202,7 @@ export default function PatientsListPage() {
  <div className="flex items-center gap-3 text-[12px] text-gray-500 mb-2">
  <div className="flex items-center gap-1">
  <Calendar className="w-3.5 h-3.5" />
- {new Date(p.date_of_birth).toLocaleDateString()} ({p.gender})
+ {formatDate(p.date_of_birth)} ({p.gender})
  </div>
  </div>
 

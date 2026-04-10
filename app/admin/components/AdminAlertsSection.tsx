@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { BellRing, ShieldAlert, ArrowRight, Check, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { formatDate } from '@/lib/format-date';
 
 interface Notification {
  id: string;
@@ -156,7 +157,7 @@ export default function AdminAlertsSection() {
  <h3 className="font-medium text-red-900 text-[15px]">{alert.title}</h3>
  <p className="text-[13px] text-red-800/80 mt-0.5 max-w-2xl leading-relaxed">{alert.message}</p>
  <div className="text-[11px] font-semibold text-red-500/80 mt-2 uppercase tracking-wider">
- {new Date(alert.created_at).toLocaleString('en-GB')}
+ {formatDate(alert.created_at)}
  </div>
  </div>
  </div>

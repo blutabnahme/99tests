@@ -1,5 +1,6 @@
 "use client";
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { formatDate } from '@/lib/format-date';
 
 import React, { useState, useEffect } from 'react';
 import { Loader2, Save, Settings, Truck, Database, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -410,7 +411,7 @@ export default function AdminConfigPage() {
             {/* Last updated */}
             {config?.updated_at && (
               <div className="text-[12px] text-gray-400 pt-4 border-t border-gray-100">
-                Last updated: {new Date(config.updated_at).toLocaleString('de-DE')}
+                Last updated: {formatDate(config.updated_at)}
               </div>
             )}
           </div>

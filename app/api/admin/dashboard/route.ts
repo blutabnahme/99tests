@@ -99,22 +99,22 @@ export async function GET(request: Request) {
       .eq('payment_method', 'bank_transfer')
       .order('created_at', { ascending: true });
 
-    // 8. Revenue by month (last 6 months) for chart
-    const revenueByMonth: { month: string; revenue: number; orders: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const mStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const mEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
-      const monthLabel = mStart.toLocaleString('en', { month: 'short', year: '2-digit' });
-
-      const { data: mOrders } = await supabaseAdmin
+    // 8. Revenue by day (last 30 days) for chart
+    const revenueByDay: { date: string; revenue: number; orders: number }[] = [];
+    for (let i = 29; i >= 0; i--) {
+      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, 0, 0, 0);
+      const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, 23, 59, 59);
+      const dayLabel = `${String(dayStart.getDate()).padStart(2, '0')}.${String(dayStart.getMonth() + 1).padStart(2, '0')}`;
+      
+      const { data: dayOrders } = await supabaseAdmin
         .from('tt_order')
         .select('total')
-        .gte('created_at', mStart.toISOString())
-        .lte('created_at', mEnd.toISOString())
+        .gte('created_at', dayStart.toISOString())
+        .lte('created_at', dayEnd.toISOString())
         .not('status', 'eq', 'awaiting_payment');
-
-      const mRevenue = (mOrders || []).reduce((sum, o) => sum + (Number(o.total) || 0), 0);
-      revenueByMonth.push({ month: monthLabel, revenue: mRevenue, orders: mOrders?.length || 0 });
+      
+      const dayRevenue = (dayOrders || []).reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+      revenueByDay.push({ date: dayLabel, revenue: dayRevenue, orders: dayOrders?.length || 0 });
     }
 
     // 9. Kanban — all active orders grouped by status
@@ -149,7 +149,7 @@ export async function GET(request: Request) {
       kanban_orders: kanbanOrders || [],
       recent_orders: recentOrders || [],
       pending_transfers: pendingTransfers || [],
-      revenue_chart: revenueByMonth,
+      revenue_chart: revenueByDay,
       pending_verifications: pendingVerifications || [],
     });
   } catch (error: any) {

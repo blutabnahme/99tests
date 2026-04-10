@@ -25,11 +25,7 @@ const SORT_OPTIONS = [
   { value: 'oldest', label: 'Oldest first' },
 ];
 
-function formatDate(iso: string): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
-}
+import { formatDate } from '@/lib/format-date';
 
 function formatCurrency(n: number): string {
   return `€${n.toFixed(2)}`;
@@ -312,13 +308,13 @@ export default function AdminRecommendationsPage() {
   const handleExport = () => {
     const csvRows = ['ID,Patient,Email,Doctor,Status,Tests,Labs,Total,Date'];
     recommendations.forEach(r => {
-      csvRows.push(`${r.display_id},"${r.patient?.first_name} ${r.patient?.last_name}",${r.patient?.email || ''},"${r.doctor?.full_name || ''}",${r.status},${r.item_count},"${(r.labs || []).join('; ')}",${r.test_total?.toFixed(2) || '0.00'},${r.created_at?.substring(0, 10) || ''}`);
+      csvRows.push(`${r.display_id},"${r.patient?.first_name} ${r.patient?.last_name}",${r.patient?.email || ''},"${r.doctor?.full_name || ''}",${r.status},${r.item_count},"${(r.labs || []).join('; ')}",${r.test_total?.toFixed(2) || '0.00'},${formatDate(r.created_at || '')}`);
     });
     const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `recommendations-export-${new Date().toISOString().substring(0, 10)}.csv`;
+    a.download = `recommendations-export-${formatDate(new Date().toISOString())}.csv`;
     a.click();
   };
 

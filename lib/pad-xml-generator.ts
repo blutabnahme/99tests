@@ -1,49 +1,237 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * PAD XML Generator — ADL v2.12
+ * 
+ * Generates PAD XML billing files for German healthcare (PVS format).
+ * Supports single-order and batch export (multiple orders grouped by lab).
+ * 
+ * GOÄ field parsing handles the catalog notation:
+ * - "4780, 4783 (2x), 4785" → [{ziffer: "4780", count: 1}, {ziffer: "4783", count: 2}, {ziffer: "4785", count: 1}]
+ * - Costs follow same pattern: "52.46, 29.15 (2x), 17.49"
+ */
 
 // ============================================================
 // TYPES
 // ============================================================
 
-interface PadExportOptions {
-  dateStart: string;       // YYYY-MM-DD
-  dateEnd: string;         // YYYY-MM-DD
-  labId?: string;          // filter by specific lab (optional)
-  includeExported: boolean; // include already-exported orders
+interface PadGoaePosition {
+  ziffer: string;
+  anzahl: number;
+  text: string;        // Parameter names (comma-separated if grouped)
+  faktor: number;
+  einzelbetrag: number; // Base cost per unit
+  gesamtbetrag: number; // einzelbetrag * anzahl
+  datum: string;        // YYYY-MM-DD
 }
 
-interface PadExportResult {
-  files: { lab_name: string; file_path: string; url: string; order_count: number }[];
-  total_orders: number;
-  total_files: number;
+interface PadInvoice {
+  id: string;           // Order display_id
+  patient: {
+    anrede: string;
+    vorname: string;
+    nachname: string;
+    gebdatum: string;   // YYYY-MM-DD
+    geschlecht: string; // M/W/D
+    land: string;
+    plz: string;
+    ort: string;
+    strasse: string;
+  };
+  empfaenger?: {        // Bill recipient (if different from patient)
+    anrede: string;
+    vorname: string;
+    nachname: string;
+    land: string;
+    plz: string;
+    ort: string;
+    strasse: string;
+  };
+  positionen: PadGoaePosition[];
+  anfangstext: string;
+}
+
+interface PadLabConfig {
+  name: string;
+  namezusatz: string;
+  land: string;
+  plz: string;
+  ort: string;
+  strasse: string;
+  aisid: string;
 }
 
 // ============================================================
-// HELPERS
+// GOÄ FIELD PARSER
 // ============================================================
 
-function padDate(d: string): string {
-  if (!d) return '';
-  // Accept YYYY-MM-DD or ISO datetime
-  return d.substring(0, 10);
+/**
+ * Parse GOÄ digit/cost fields with (Nx) multiplier notation.
+ * 
+ * Input: "4780, 4783 (2x), 4785"
+ * Output: [{value: "4780", count: 1}, {value: "4783", count: 2}, {value: "4785", count: 1}]
+ * 
+ * Also handles: "A4210", "3587.H1", "A3905.H3"
+ */
+function parseGoaeField(raw: string): { value: string; count: number }[] {
+  if (!raw || raw.trim() === '') return [];
+  
+  const results: { value: string; count: number }[] = [];
+  
+  // Split by comma, handling spaces
+  const parts = raw.split(',').map(p => p.trim()).filter(Boolean);
+  
+  for (const part of parts) {
+    // Check for (Nx) multiplier
+    const multiplierMatch = part.match(/^(.+?)\s*\((\d+)x\)\s*$/i);
+    if (multiplierMatch) {
+      results.push({
+        value: multiplierMatch[1].trim(),
+        count: parseInt(multiplierMatch[2], 10),
+      });
+    } else {
+      results.push({
+        value: part.trim(),
+        count: 1,
+      });
+    }
+  }
+  
+  return results;
 }
 
-function padMoney(n: number): string {
-  return n.toFixed(2);
+/**
+ * Expand GOÄ data from catalog fields into individual positions.
+ * 
+ * Takes the raw goae_digit, goae_cost, goae_name, goae_factor fields
+ * and expands them into flat position entries, repeating for (Nx) multipliers.
+ */
+function expandGoaePositions(
+  goaeDigit: string,
+  goaeCost: string,
+  goaeName: string,
+  goaeFaktor: string,
+  parameterName: string,
+  datum: string
+): PadGoaePosition[] {
+  const digits = parseGoaeField(goaeDigit);
+  const costs = parseGoaeField(goaeCost);
+  const names = goaeName ? goaeName.split(',').map(n => n.trim()) : [];
+  const faktor = parseFloat(goaeFaktor) || 1.0;
+  
+  const positions: PadGoaePosition[] = [];
+  
+  // Expand digits with their counts
+  let costIdx = 0;
+  for (const digit of digits) {
+    const cost = costs[costIdx]
+      ? parseFloat(costs[costIdx].value) || 0
+      : 0;
+    
+    // For multiplied entries, the cost is per-unit
+    const einzelbetrag = cost;
+    const anzahl = digit.count;
+    
+    positions.push({
+      ziffer: digit.value,
+      anzahl,
+      text: parameterName, // Will be updated during grouping
+      faktor,
+      einzelbetrag,
+      gesamtbetrag: parseFloat((einzelbetrag * anzahl * faktor).toFixed(2)),
+      datum,
+    });
+    
+    costIdx++;
+  }
+  
+  return positions;
 }
 
-function padGender(g: string): string {
-  const lower = (g || '').toLowerCase().trim();
-  if (lower === 'm' || lower.startsWith('mann') || lower === 'herr') return 'M';
-  if (lower === 'w' || lower.startsWith('weib') || lower === 'frau') return 'W';
+// ============================================================
+// POSITION GROUPING
+// ============================================================
+
+/**
+ * Group positions by GOÄ ziffer within an invoice.
+ * 
+ * When multiple parameters share the same ziffer, they become one position:
+ * - anzahl = sum of all counts
+ * - text = comma-separated parameter names
+ * - einzelbetrag = cost per unit (should be same for same ziffer)
+ * - gesamtbetrag = einzelbetrag * total anzahl * faktor
+ */
+function groupPositionsByZiffer(positions: PadGoaePosition[]): PadGoaePosition[] {
+  const groups = new Map<string, {
+    ziffer: string;
+    anzahl: number;
+    texts: string[];
+    faktor: number;
+    einzelbetrag: number;
+    datum: string;
+  }>();
+  
+  for (const pos of positions) {
+    const key = `${pos.ziffer}_${pos.faktor}_${pos.einzelbetrag}`;
+    
+    if (groups.has(key)) {
+      const existing = groups.get(key)!;
+      existing.anzahl += pos.anzahl;
+      if (!existing.texts.includes(pos.text)) {
+        existing.texts.push(pos.text);
+      }
+    } else {
+      groups.set(key, {
+        ziffer: pos.ziffer,
+        anzahl: pos.anzahl,
+        texts: [pos.text],
+        faktor: pos.faktor,
+        einzelbetrag: pos.einzelbetrag,
+        datum: pos.datum,
+      });
+    }
+  }
+  
+  return Array.from(groups.values()).map(g => ({
+    ziffer: g.ziffer,
+    anzahl: g.anzahl,
+    text: g.texts.join(', '),
+    faktor: g.faktor,
+    einzelbetrag: g.einzelbetrag,
+    gesamtbetrag: parseFloat((g.einzelbetrag * g.anzahl * g.faktor).toFixed(2)),
+    datum: g.datum,
+  }));
+}
+
+// ============================================================
+// GENDER / ANREDE MAPPING
+// ============================================================
+
+function mapAnrede(gender: string): string {
+  const g = (gender || '').toUpperCase().trim();
+  if (g === 'M') return 'Herr';
+  if (g === 'W' || g === 'F') return 'Frau';
+  return 'Herr';
+}
+
+function mapAnredeInformal(gender: string): string {
+  const g = (gender || '').toUpperCase().trim();
+  if (g === 'M') return 'Mr.';
+  if (g === 'W' || g === 'F') return 'Frau';
+  return 'Mr.';
+}
+
+function mapGeschlecht(gender: string): string {
+  const g = (gender || '').toUpperCase().trim();
+  if (g === 'M' || g === 'MALE') return 'M';
+  if (g === 'W' || g === 'F' || g === 'FEMALE') return 'W';
+  if (g === 'D') return 'D';
   return 'M';
 }
 
-function padAnrede(gender: string): string {
-  const g = padGender(gender);
-  return g === 'W' ? 'Frau' : 'Herr';
-}
+// ============================================================
+// XML BUILDER
+// ============================================================
 
-function escapeXml(s: string): string {
+function escXml(s: string): string {
   return (s || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -52,330 +240,315 @@ function escapeXml(s: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function sanitizeLabForFilename(name: string): string {
-  return (name || 'Labor')
-    .replace(/[^a-zA-Z0-9äöüÄÖÜß\s-]/g, '')
-    .replace(/\s+/g, '_')
-    .substring(0, 30);
-}
-
-// ============================================================
-// XML BUILDER
-// ============================================================
-
-function buildPadXml(
-  labInfo: any,
-  orders: { orderId: string; displayId: string; snap: any; paymentDate: string }[]
+/**
+ * Build the complete PAD XML string for a batch of invoices.
+ */
+export function buildPadXml(
+  lab: PadLabConfig,
+  invoices: PadInvoice[]
 ): string {
-  const ns = 'http://padinfo.de/ns/pad';
-
-  let xml = '<?xml version="1.0" encoding="utf-8"?>\n';
-  xml += `<rechnungen xmlns="${ns}" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" `;
-  xml += `xsi:schemaLocation="${ns} http://padinfo.de/ns/pad/padx_auf_v2.12.xsd" `;
-  xml += `anzahl="${orders.length}">\n`;
-
-  // nachrichtentyp
-  xml += `  <nachrichtentyp version="02.12">ADL</nachrichtentyp>\n`;
-
-  // rechnungsersteller (lab)
-  xml += `  <rechnungsersteller>\n`;
-  xml += `    <name>${escapeXml(labInfo.name || '')}</name>\n`;
-  xml += `    <namezusatz>${escapeXml(labInfo.namezusatz || labInfo.name || '')}</namezusatz>\n`;
-  xml += buildAnschriftXml(labInfo, 4);
-  xml += `  </rechnungsersteller>\n`;
-
-  // leistungserbringer (lab as service provider)
-  xml += `  <leistungserbringer id="01" aisid="${escapeXml(labInfo.aisid || '')}">\n`;
-  xml += `    <name>${escapeXml(labInfo.name || '')}</name>\n`;
-  xml += buildAnschriftXml(labInfo, 4);
-  xml += `  </leistungserbringer>\n`;
-
-  // One <rechnung> per order
-  for (const order of orders) {
-    const snap = order.snap;
-    if (!snap || !snap.positions || snap.positions.length === 0) continue;
-
-    const invoiceId = order.displayId || `A-${order.orderId.substring(0, 8)}`;
-    const doctorName = snap.doctor?.full_name || 'Unbekannter Arzt';
-
-    xml += `  <rechnung id="${escapeXml(invoiceId)}" aisrechnungsnr="${escapeXml(invoiceId)}">\n`;
-
-    // rechnungsempfaenger (patient)
-    const patient = snap.patient || {};
-    xml += `    <rechnungsempfaenger>\n`;
-    xml += `      <person>\n`;
-    xml += `        <anrede>${escapeXml(padAnrede(patient.gender))}</anrede>\n`;
-    xml += `        <vorname>${escapeXml(patient.first_name || '')}</vorname>\n`;
-    xml += `        <name>${escapeXml(patient.last_name || '')}</name>\n`;
-    xml += `      </person>\n`;
-    xml += `    </rechnungsempfaenger>\n`;
-
-    // abrechnungsfall > humanmedizin
-    xml += `    <abrechnungsfall>\n`;
-    xml += `      <humanmedizin>\n`;
-
-    // behandelter (patient being treated)
-    xml += `        <behandelter>\n`;
-    xml += `          <person>\n`;
-    xml += `            <anrede>${escapeXml(padAnrede(patient.gender))}</anrede>\n`;
-    xml += `            <vorname>${escapeXml(patient.first_name || '')}</vorname>\n`;
-    xml += `            <name>${escapeXml(patient.last_name || '')}</name>\n`;
-    if (patient.date_of_birth) {
-      xml += `            <gebdatum>${padDate(patient.date_of_birth)}</gebdatum>\n`;
-    }
-    xml += `            <geschlecht>${padGender(patient.gender)}</geschlecht>\n`;
-    xml += `          </person>\n`;
-    xml += `        </behandelter>\n`;
-
-    // positionen
-    const positions = snap.positions || [];
-    xml += `        <positionen posanzahl="${positions.length}">\n`;
-
-    const insuranceType = (patient.insurance_type || '').toLowerCase();
-    const posDate = order.paymentDate ? padDate(order.paymentDate) : padDate(snap.generated_at || '');
-
-    positions.forEach((pos: any, idx: number) => {
-      const posNr = idx + 1;
-      const goDigit = pos.goae_digit || '';
-      const goName = pos.goae_name || '';
-      const qty = pos.quantity || 1;
-
-      // Factor: ArminLabs always 1.15, others depend on insurance
-      let faktor = 1.00;
-      const labNameLower = (pos.laboratory || '').toLowerCase();
-      if (labNameLower.includes('armin')) {
-        faktor = 1.15;
-      } else if (insuranceType.includes('privat')) {
-        faktor = 1.15;
-      }
-      // Use per-position factor if stored
-      if (pos.goae_factor) {
-        const parsed = parseFloat(pos.goae_factor);
-        if (!isNaN(parsed) && parsed > 0) faktor = parsed;
-      }
-
-      // Parse cost
-      let einzelbetrag: number | null = null;
-      if (pos.goae_cost) {
-        // goae_cost might be "20.40" or "20.40 (2x)" — extract first number
-        const costMatch = pos.goae_cost.match(/([\d.,]+)/);
-        if (costMatch) {
-          einzelbetrag = parseFloat(costMatch[1].replace(',', '.'));
-        }
-      }
-
-      const gesamtbetrag = einzelbetrag != null ? einzelbetrag * qty * faktor : null;
-
-      xml += `          <goziffer positionsnr="${posNr}" go="GOAE" ziffer="${escapeXml(goDigit)}">\n`;
-      xml += `            <datum>${posDate}</datum>\n`;
-      xml += `            <anzahl>${Math.max(1, qty)}</anzahl>\n`;
-      if (goName) {
-        xml += `            <text>${escapeXml(goName)}</text>\n`;
-      }
-      xml += `            <faktor>${faktor.toFixed(2)}</faktor>\n`;
-      if (einzelbetrag != null) {
-        xml += `            <einzelbetrag>${padMoney(einzelbetrag)}</einzelbetrag>\n`;
-      }
-      if (gesamtbetrag != null) {
-        xml += `            <gesamtbetrag>${padMoney(gesamtbetrag)}</gesamtbetrag>\n`;
-      }
-      xml += `          </goziffer>\n`;
+  const lines: string[] = [];
+  
+  lines.push('<?xml version="1.0" encoding="utf-8"?>');
+  lines.push(`<rechnungen xmlns="http://padinfo.de/ns/pad" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://padinfo.de/ns/pad http://padinfo.de/ns/pad/padx_auf_v2.12.xsd" anzahl="${invoices.length}">`);
+  lines.push('  <nachrichtentyp version="02.12">ADL</nachrichtentyp>');
+  
+  // Rechnungsersteller (invoice creator)
+  lines.push('  <rechnungsersteller>');
+  lines.push(`    <n>${escXml(lab.name)}</n>`);
+  if (lab.namezusatz) lines.push(`    <namezusatz>${escXml(lab.namezusatz)}</namezusatz>`);
+  lines.push('    <anschrift>');
+  lines.push('      <hausadresse>');
+  lines.push(`        <land>${escXml(lab.land)}</land>`);
+  lines.push(`        <plz>${escXml(lab.plz)}</plz>`);
+  lines.push(`        <ort>${escXml(lab.ort)}</ort>`);
+  lines.push(`        <strasse>${escXml(lab.strasse)}</strasse>`);
+  if (lab.namezusatz) lines.push(`        <namezusatz>${escXml(lab.namezusatz)}</namezusatz>`);
+  lines.push('      </hausadresse>');
+  lines.push('    </anschrift>');
+  lines.push('  </rechnungsersteller>');
+  
+  // Leistungserbringer (service provider = same as lab)
+  lines.push(`  <leistungserbringer id="01" aisid="${escXml(lab.aisid)}">`);
+  lines.push(`    <n>${escXml(lab.name)}</n>`);
+  if (lab.namezusatz) lines.push(`    <namezusatz>${escXml(lab.namezusatz)}</namezusatz>`);
+  lines.push('    <anschrift>');
+  lines.push('      <hausadresse>');
+  lines.push(`        <land>${escXml(lab.land)}</land>`);
+  lines.push(`        <plz>${escXml(lab.plz)}</plz>`);
+  lines.push(`        <ort>${escXml(lab.ort)}</ort>`);
+  lines.push(`        <strasse>${escXml(lab.strasse)}</strasse>`);
+  if (lab.namezusatz) lines.push(`        <namezusatz>${escXml(lab.namezusatz)}</namezusatz>`);
+  lines.push('      </hausadresse>');
+  lines.push('    </anschrift>');
+  lines.push('  </leistungserbringer>');
+  
+  // Individual invoices (Rechnungen)
+  for (const inv of invoices) {
+    lines.push(`  <rechnung id="${escXml(inv.id)}" aisrechnungsnr="${escXml(inv.id)}">`);
+    
+    // Rechnungsempfänger (bill recipient)
+    const emp = inv.empfaenger || inv.patient;
+    lines.push('    <rechnungsempfaenger>');
+    lines.push('      <person>');
+    lines.push(`        <anrede>${escXml(emp.anrede || mapAnredeInformal(inv.patient.geschlecht))}</anrede>`);
+    lines.push(`        <vorname>${escXml(emp.vorname || inv.patient.vorname)}</vorname>`);
+    lines.push(`        <n>${escXml(emp.nachname || inv.patient.nachname)}</n>`);
+    lines.push('        <anschrift>');
+    lines.push('          <hausadresse>');
+    lines.push(`            <land>${escXml(emp.land || inv.patient.land || 'D')}</land>`);
+    if (emp.plz || inv.patient.plz) lines.push(`            <plz>${escXml(emp.plz || inv.patient.plz)}</plz>`);
+    if (emp.ort || inv.patient.ort) lines.push(`            <ort>${escXml(emp.ort || inv.patient.ort)}</ort>`);
+    if (emp.strasse || inv.patient.strasse) lines.push(`            <strasse>${escXml(emp.strasse || inv.patient.strasse)}</strasse>`);
+    lines.push('          </hausadresse>');
+    lines.push('        </anschrift>');
+    lines.push('      </person>');
+    lines.push('    </rechnungsempfaenger>');
+    
+    // Abrechnungsfall
+    lines.push('    <abrechnungsfall>');
+    lines.push('      <humanmedizin>');
+    
+    // Behandelter (patient treated)
+    lines.push('        <behandelter>');
+    lines.push(`          <anrede>${escXml(mapAnrede(inv.patient.geschlecht))}</anrede>`);
+    lines.push(`          <vorname>${escXml(inv.patient.vorname)}</vorname>`);
+    lines.push(`          <n>${escXml(inv.patient.nachname)}</n>`);
+    lines.push(`          <gebdatum>${escXml(inv.patient.gebdatum)}</gebdatum>`);
+    lines.push(`          <geschlecht>${escXml(mapGeschlecht(inv.patient.geschlecht))}</geschlecht>`);
+    lines.push('        </behandelter>');
+    
+    // Versicherter (insured person = same as patient for now)
+    lines.push('        <versicherter>');
+    lines.push(`          <anrede>${escXml(mapAnrede(inv.patient.geschlecht))}</anrede>`);
+    lines.push(`          <vorname>${escXml(inv.patient.vorname)}</vorname>`);
+    lines.push(`          <n>${escXml(inv.patient.nachname)}</n>`);
+    lines.push(`          <gebdatum>${escXml(inv.patient.gebdatum)}</gebdatum>`);
+    lines.push(`          <geschlecht>${escXml(mapGeschlecht(inv.patient.geschlecht))}</geschlecht>`);
+    lines.push('        </versicherter>');
+    
+    // Positionen (GOÄ positions)
+    lines.push(`        <positionen posanzahl="${inv.positionen.length}">`);
+    
+    inv.positionen.forEach((pos, idx) => {
+      lines.push(`          <goziffer positionsnr="${idx + 1}" go="GOAE" ziffer="${escXml(pos.ziffer)}">`);
+      lines.push(`            <datum>${escXml(pos.datum)}</datum>`);
+      lines.push(`            <anzahl>${pos.anzahl}</anzahl>`);
+      lines.push(`            <text>${escXml(pos.text)}</text>`);
+      lines.push(`            <faktor>${pos.faktor.toFixed(pos.faktor % 1 === 0 ? 2 : 4)}</faktor>`);
+      lines.push(`            <einzelbetrag>${pos.einzelbetrag.toFixed(2)}</einzelbetrag>`);
+      lines.push(`            <gesamtbetrag>${pos.gesamtbetrag.toFixed(2)}</gesamtbetrag>`);
+      lines.push('          </goziffer>');
     });
-
-    xml += `        </positionen>\n`;
-    xml += `      </humanmedizin>\n`;
-    xml += `    </abrechnungsfall>\n`;
-
-    // anfangstext
-    xml += `    <anfangstext>Auf Veranlassung von ${escapeXml(doctorName)} Rechnungsbetrag wurde bereits bezahlt.</anfangstext>\n`;
-
-    xml += `  </rechnung>\n`;
+    
+    lines.push('        </positionen>');
+    lines.push('      </humanmedizin>');
+    lines.push('    </abrechnungsfall>');
+    
+    // Anfangstext
+    if (inv.anfangstext) {
+      lines.push(`    <anfangstext>${escXml(inv.anfangstext)}</anfangstext>`);
+    }
+    
+    lines.push('  </rechnung>');
   }
-
-  xml += `</rechnungen>\n`;
-  return xml;
-}
-
-function buildAnschriftXml(lab: any, indent: number): string {
-  const pad = ' '.repeat(indent);
-  let xml = `${pad}<anschrift>\n`;
-  xml += `${pad}  <hausadresse>\n`;
-  xml += `${pad}    <land>${escapeXml(lab.land || 'D')}</land>\n`;
-  if (lab.plz) xml += `${pad}    <plz>${escapeXml(lab.plz)}</plz>\n`;
-  if (lab.ort) xml += `${pad}    <ort>${escapeXml(lab.ort)}</ort>\n`;
-  if (lab.strasse) xml += `${pad}    <strasse>${escapeXml(lab.strasse)}</strasse>\n`;
-  xml += `${pad}  </hausadresse>\n`;
-  xml += `${pad}</anschrift>\n`;
-  return xml;
+  
+  lines.push('</rechnungen>');
+  
+  return lines.join('\r\n');
 }
 
 // ============================================================
-// MAIN EXPORT FUNCTION
+// DATA ASSEMBLY FROM PAD SNAPSHOT
 // ============================================================
 
-export async function runPadExport(options: PadExportOptions): Promise<PadExportResult> {
-  const supabaseAdmin = createClient(
+/**
+ * Convert a PAD/PVS snapshot (stored as JSON on the order) into PadInvoice format.
+ * 
+ * This handles:
+ * - Parsing GOÄ (Nx) notation
+ * - Expanding positions
+ * - Grouping by ziffer (same ziffer from different params → one position with comma-separated names)
+ * - Correct einzelbetrag/gesamtbetrag calculation
+ */
+export function snapshotToInvoice(
+  snapshot: any,
+  orderDate: string
+): PadInvoice | null {
+  if (!snapshot || !snapshot.positions || snapshot.positions.length === 0) {
+    return null;
+  }
+  
+  const patient = snapshot.patient || {};
+  const doctor = snapshot.doctor || {};
+  const datum = orderDate ? orderDate.substring(0, 10) : new Date().toISOString().substring(0, 10);
+  
+  // Expand all GOÄ positions from snapshot
+  const allPositions: PadGoaePosition[] = [];
+  
+  for (const pos of snapshot.positions) {
+    const expanded = expandGoaePositions(
+      pos.goae_digit || '',
+      pos.goae_cost || '',
+      pos.goae_name || '',
+      pos.goae_factor || '1.00',
+      pos.parameter_name || '',
+      datum
+    );
+    allPositions.push(...expanded);
+  }
+  
+  // Group by ziffer (same ziffer → combine names, sum anzahl)
+  const grouped = groupPositionsByZiffer(allPositions);
+  
+  if (grouped.length === 0) return null;
+  
+  // Format DOB
+  let gebdatum = patient.date_of_birth || '';
+  if (gebdatum.length === 8 && !gebdatum.includes('-')) {
+    // YYYYMMDD → YYYY-MM-DD
+    gebdatum = `${gebdatum.substring(0, 4)}-${gebdatum.substring(4, 6)}-${gebdatum.substring(6, 8)}`;
+  }
+  
+  // Build anfangstext
+  const doctorName = doctor.full_name || '';
+  const anfangstext = doctorName
+    ? \`Auf Veranlassung von \${doctorName}. Rechnungsbetrag wurde bereits bezahlt.\`
+    : 'Rechnungsbetrag wurde bereits bezahlt.';
+  
+  return {
+    id: snapshot.order_display_id || '',
+    patient: {
+      anrede: mapAnrede(patient.gender || ''),
+      vorname: patient.first_name || '',
+      nachname: patient.last_name || '',
+      gebdatum,
+      geschlecht: mapGeschlecht(patient.gender || ''),
+      land: 'D',
+      plz: '',  // From patient address if available
+      ort: '',
+      strasse: '',
+    },
+    positionen: grouped,
+    anfangstext,
+  };
+}
+
+// ============================================================
+// BATCH EXPORT
+// ============================================================
+
+/**
+ * Generate a batch PAD XML file from multiple orders.
+ * Groups orders by lab and generates one XML file per lab.
+ */
+export async function generatePadBatchExport(
+  orderIds: string[]
+): Promise<{ success: boolean; files: { labName: string; xml: string; filename: string }[]; error?: string }> {
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
-
-  // 1. Query eligible orders
-  let query = supabaseAdmin
-    .from('tt_order')
-    .select('id, display_id, recommendation_id, doctor_id, patient_id, pad_pvs_data, pad_export_status, created_at, payment_confirmed_at, status')
-    .in('status', ['results_ready', 'completed'])
-    .gte('created_at', `${options.dateStart}T00:00:00Z`)
-    .lte('created_at', `${options.dateEnd}T23:59:59Z`);
-
-  if (!options.includeExported) {
-    query = query.or('pad_export_status.eq.pending,pad_export_status.is.null');
-  }
-
-  const { data: orders, error: ordersError } = await query.order('created_at', { ascending: true });
-
-  if (ordersError) throw ordersError;
-  if (!orders || orders.length === 0) {
-    throw new Error('No eligible orders found for the given date range.');
-  }
-
-  // 2. Group orders by lab (from pad_pvs_data.positions[].laboratory_id)
-  const labGroups = new Map<string, { labId: string; labName: string; orders: any[] }>();
-
-  for (const order of orders) {
-    const snap = order.pad_pvs_data;
-    if (!snap || !snap.positions || snap.positions.length === 0) continue;
-
-    // Collect unique labs from positions
-    const labsInOrder = new Map<string, string>();
-    for (const pos of snap.positions) {
-      if (pos.laboratory_id && pos.laboratory) {
-        labsInOrder.set(pos.laboratory_id, pos.laboratory);
-      }
-    }
-
-    // Apply lab filter if specified
-    for (const [labId, labName] of Array.from(labsInOrder.entries())) {
-      if (options.labId && options.labId !== labId) continue;
-
-      if (!labGroups.has(labId)) {
-        labGroups.set(labId, { labId, labName, orders: [] });
-      }
-      labGroups.get(labId)!.orders.push({
-        orderId: order.id,
-        displayId: order.display_id || order.id.substring(0, 8),
-        snap: {
-          ...snap,
-          // Filter positions to only this lab
-          positions: snap.positions.filter((p: any) => p.laboratory_id === labId),
-        },
-        paymentDate: order.payment_confirmed_at || order.created_at,
-      });
-    }
-  }
-
-  if (labGroups.size === 0) {
-    throw new Error('No eligible orders with billing data found for the given filters.');
-  }
-
-  // 3. Fetch lab details for XML headers
-  const labIds = Array.from(labGroups.keys());
-  const { data: labs } = await supabaseAdmin
-    .from('tt_laboratory')
-    .select('id, name, official_name, address_street, address_zip, address_city, pdf_config')
-    .in('id', labIds);
-
-  const labInfoMap = new Map<string, any>();
-  for (const lab of (labs || [])) {
-    const cfg = lab.pdf_config || {};
-    labInfoMap.set(lab.id, {
-      name: lab.official_name || cfg.legal_entity || lab.name,
-      namezusatz: lab.name,
-      land: 'D',
-      plz: lab.address_zip || '',
-      ort: lab.address_city || '',
-      strasse: lab.address_street || '',
-      aisid: cfg.aisid || '',
-      kundennr: cfg.customer_number || '',
-    });
-  }
-
-  // 4. Get export counter
-  const { data: counterRow } = await supabaseAdmin
-    .from('tt_service_config')
-    .select('id, pad_export_counter')
-    .limit(1)
-    .single();
-
-  let currentCounter = counterRow?.pad_export_counter || 0;
-
-  // 5. Generate XML files and upload
-  const results: PadExportResult = { files: [], total_orders: 0, total_files: 0 };
-  const batchId = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-  const dateStr = new Date().toISOString().substring(0, 10).replace(/-/g, '');
-  const exportedOrderIds: string[] = [];
-
-  for (const group of Array.from(labGroups.values())) {
-    const labId = group.labId;
-    const labInfo = labInfoMap.get(labId) || { name: group.labName, land: 'D' };
-
-    const xmlContent = buildPadXml(labInfo, group.orders);
-
-    currentCounter++;
-    const safeLab = sanitizeLabForFilename(group.labName);
-    const filename = `PV345000_${dateStr}_${safeLab}_${currentCounter}_padx.xml`;
-    const filePath = `exports/pad/${batchId}/${filename}`;
-
-    // Upload to Supabase Storage
-    const buffer = Buffer.from(xmlContent, 'utf-8');
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('documents')
-      .upload(filePath, buffer, {
-        contentType: 'application/xml',
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error(`[PAD Export] Upload failed for lab ${group.labName}:`, uploadError);
-      continue;
-    }
-
-    const { data: signedUrl } = await supabaseAdmin.storage
-      .from('documents')
-      .createSignedUrl(filePath, 7 * 24 * 60 * 60); // 7 days
-
-    results.files.push({
-      lab_name: group.labName,
-      file_path: filePath,
-      url: signedUrl?.signedUrl || '',
-      order_count: group.orders.length,
-    });
-
-    results.total_orders += group.orders.length;
-    results.total_files++;
-
-    // Collect order IDs for marking
-    group.orders.forEach(o => exportedOrderIds.push(o.orderId));
-  }
-
-  // 6. Update export counter
-  if (counterRow) {
-    await supabaseAdmin
-      .from('tt_service_config')
-      .update({ pad_export_counter: currentCounter })
-      .eq('id', counterRow.id);
-  }
-
-  // 7. Mark orders as exported
-  for (const oid of Array.from(new Set(exportedOrderIds))) {
-    await supabaseAdmin
+  
+  try {
+    // Fetch orders with their PAD snapshots
+    const { data: orders, error } = await supabase
       .from('tt_order')
-      .update({
-        pad_export_status: 'exported',
-        pad_exported_at: new Date().toISOString(),
-        pad_export_batch_id: batchId,
-      })
-      .eq('id', oid);
+      .select(\`
+        id, display_id, created_at, pad_pvs_data,
+        recommendation:recommendation_id(
+          patient:patient_id(first_name, last_name, date_of_birth, gender, 
+            address_line1, address_zip, address_city, address_country)
+        )
+      \`)
+      .in('id', orderIds)
+      .not('pad_pvs_data', 'is', null);
+    
+    if (error) throw error;
+    if (!orders || orders.length === 0) {
+      return { success: false, files: [], error: 'No orders with PAD data found' };
+    }
+    
+    // Group orders by lab
+    const labGroups = new Map<string, { labName: string; invoices: PadInvoice[] }>();
+    
+    for (const order of orders) {
+      const snapshot = order.pad_pvs_data as any;
+      if (!snapshot) continue;
+      
+      const invoice = snapshotToInvoice(snapshot, order.created_at);
+      if (!invoice) continue;
+      
+      // Enrich patient address from the recommendation.patient join
+      const patientData = (order.recommendation as any)?.patient;
+      if (patientData) {
+        invoice.patient.plz = patientData.address_zip || '';
+        invoice.patient.ort = patientData.address_city || '';
+        invoice.patient.strasse = patientData.address_line1 || '';
+        invoice.patient.land = patientData.address_country || 'D';
+        // Also set as empfaenger (bill goes to patient)
+        invoice.empfaenger = {
+          anrede: mapAnredeInformal(patientData.gender || ''),
+          vorname: patientData.first_name || '',
+          nachname: patientData.last_name || '',
+          land: patientData.address_country || 'D',
+          plz: patientData.address_zip || '',
+          ort: patientData.address_city || '',
+          strasse: patientData.address_line1 || '',
+        };
+      }
+      
+      // Group by each lab involved
+      const labs = snapshot.totals?.labs_involved || ['Unknown'];
+      for (const labName of labs) {
+        if (!labGroups.has(labName)) {
+          labGroups.set(labName, { labName, invoices: [] });
+        }
+        labGroups.get(labName)!.invoices.push(invoice);
+      }
+    }
+    
+    // Fetch lab configs
+    const labNames = Array.from(labGroups.keys());
+    const { data: labConfigs } = await supabase
+      .from('tt_laboratory')
+      .select('id, name, official_name, practice_name, address_street, address_zip, address_city, address_country, aisid, pad_config')
+      .in('name', labNames);
+    
+    const labConfigMap = new Map<string, any>();
+    labConfigs?.forEach(l => labConfigMap.set(l.name, l));
+    
+    // Generate XML files per lab
+    const files: { labName: string; xml: string; filename: string }[] = [];
+    
+    for (const [labName, group] of labGroups) {
+      const labData = labConfigMap.get(labName);
+      
+      const labConfig: PadLabConfig = {
+        name: labData?.official_name || labData?.name || labName,
+        namezusatz: labData?.practice_name || '',
+        land: labData?.address_country || 'D',
+        plz: labData?.address_zip || '',
+        ort: labData?.address_city || '',
+        strasse: labData?.address_street || '',
+        aisid: labData?.aisid || '999999999',
+      };
+      
+      const xml = buildPadXml(labConfig, group.invoices);
+      
+      // Filename pattern: PV345000_YYYYMMDD_labname_count_padx.xml
+      const date = new Date().toISOString().substring(0, 10).replace(/-/g, '');
+      const labSlug = labName.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
+      const filename = \`PV345000_\${date}_\${labSlug}_\${group.invoices.length}_padx.xml\`;
+      
+      files.push({ labName, xml, filename });
+    }
+    
+    return { success: true, files };
+    
+  } catch (err: any) {
+    console.error('[PAD XML] Batch export error:', err);
+    return { success: false, files: [], error: err.message };
   }
-
-  return results;
 }

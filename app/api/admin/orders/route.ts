@@ -37,7 +37,11 @@ export async function GET(request: Request) {
       `, { count: 'exact' });
 
     if (status && status !== 'all') {
-      query = query.eq('status', status);
+      if (status === 'has_resend') {
+        query = query.gt('resend_count', 0);
+      } else {
+        query = query.eq('status', status);
+      }
     }
 
     if (payment_method && payment_method !== 'all') {

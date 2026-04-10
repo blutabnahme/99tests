@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Key, Copy, Check, Lock, ShieldAlert, Activity, Power, X } from "lucide-react";
 import { generateApiKey, getApiConfig, getApiLogs, updateApiConfig, updateWebhookUrl, generateWebhookSecret, getWebhookLogs } from "./api-actions";
+import { formatDate } from '@/lib/format-date';
 import { Button } from "@/components/ui/Button";
 
 interface Props {
@@ -283,7 +284,7 @@ export function HcApiSettingsModal({ hcId, hcName, onClose }: Props) {
  <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-500 text-[13px]">No recent audit logs recorded.</td></tr>
  ) : logs.map(l => (
  <tr key={l.id} className="hover:bg-gray-50">
- <td className="px-4 py-3 text-[12px] text-gray-500 font-medium">{new Date(l.created_at).toLocaleString()}</td>
+ <td className="px-4 py-3 text-[12px] text-gray-500 font-medium">{formatDate(l.created_at)}</td>
  <td className="px-4 py-3 text-[12px] font-bold text-near-black">
  <span className={`px-2 py-0.5 rounded uppercase text-[10px] ${l.method === 'GET' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
  {l.method}
@@ -323,7 +324,7 @@ export function HcApiSettingsModal({ hcId, hcName, onClose }: Props) {
  <tr><td colSpan={4} className="px-4 py-6 text-center text-gray-500 text-[13px]">No recent webhook deliveries recorded.</td></tr>
  ) : webhookLogs.map(l => (
  <tr key={l.id} className="hover:bg-gray-50">
- <td className="px-4 py-3 text-[12px] text-gray-500 font-medium">{new Date(l.created_at).toLocaleString()}</td>
+ <td className="px-4 py-3 text-[12px] text-gray-500 font-medium">{formatDate(l.created_at)}</td>
  <td className="px-4 py-3 text-[12px] font-bold text-near-black">
  <span className="px-2 py-0.5 rounded text-[11px] bg-purple-50 text-purple-700">
  {l.event_type}

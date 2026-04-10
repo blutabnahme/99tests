@@ -9,6 +9,7 @@ import { ChevronLeft, ArrowLeft, Loader2, Edit2, Trash2, Send, Mail, CheckCircle
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmModal } from '@/components/shared/ConfirmModal';
+import { formatDate } from '@/lib/format-date';
 
 export default function RecommendationDetail({ params }: { params: { id: string } }) {
  const router = useRouter();
@@ -131,7 +132,7 @@ export default function RecommendationDetail({ params }: { params: { id: string 
  <h1 className="font-heading text-[24px] font-medium text-near-black">Recommendation <span className="font-mono text-gray-400 text-[20px]">{data.display_id}</span></h1>
  <StatusBadge status={data.status} />
  </div>
- <p className="text-[13px] text-gray-500 mt-1">Created on {new Date(data.created_at).toLocaleDateString()}</p>
+ <p className="text-[13px] text-gray-500 mt-1">Created on {formatDate(data.created_at)}</p>
  </div>
  </div>
  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
@@ -272,7 +273,7 @@ export default function RecommendationDetail({ params }: { params: { id: string 
  <div>
  <div className="font-medium text-[18px] text-near-black">{data.patient?.first_name} {data.patient?.last_name}</div>
  <div className="text-[14px] text-gray-500 mt-0.5">
- DOB: {data.patient?.date_of_birth ? new Date(data.patient.date_of_birth).toLocaleDateString() : 'N/A'} • {data.patient?.email || 'No email provided'}
+ DOB: {data.patient?.date_of_birth ? formatDate(data.patient.date_of_birth) : 'N/A'} • {data.patient?.email || 'No email provided'}
  </div>
  </div>
  </div>
@@ -412,7 +413,7 @@ export default function RecommendationDetail({ params }: { params: { id: string 
  <div className="flex justify-between items-center"><span className="text-gray-500">Billing:</span> <span className={data.billing_mode === 'doctor' ? 'text-primary font-semibold' : 'font-medium'}>{data.billing_mode === 'doctor' ? 'Doctor pays (monthly invoice)' : 'Patient pays'}</span></div>
  <div className="flex justify-between items-center"><span className="text-gray-500">Collection Method:</span> <span className="font-medium">{collectionLabels[data.collection_preference] || 'Not specified'}</span></div>
  <div className="flex justify-between items-center"><span className="text-gray-500">Results Delivery:</span> <span className="font-medium">{deliveryLabels[data.results_delivery] || 'Not specified'}</span></div>
- <div className="flex justify-between items-center"><span className="text-gray-500">Expected Blood Draw:</span> <span className="font-medium">{data.expected_appointment_date ? new Date(data.expected_appointment_date).toLocaleDateString() : 'TBD'}</span></div>
+ <div className="flex justify-between items-center"><span className="text-gray-500">Expected Blood Draw:</span> <span className="font-medium">{data.expected_appointment_date ? formatDate(data.expected_appointment_date) : 'TBD'}</span></div>
  </div>
  </div>
  

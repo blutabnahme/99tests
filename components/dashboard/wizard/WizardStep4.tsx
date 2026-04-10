@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Edit2, Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { formatDate } from '@/lib/format-date';
 
 export default function WizardStep4({ 
  patient, 
@@ -175,7 +176,7 @@ export default function WizardStep4({
  </div>
  <div>
  <div className="font-semibold text-[18px] text-near-black">{patient.first_name} {patient.last_name}</div>
- <div className="text-[14px] text-gray-500 mt-0.5">DOB: {new Date(patient.date_of_birth).toLocaleDateString()} • {patient.email || 'No email'}</div>
+ <div className="text-[14px] text-gray-500 mt-0.5">DOB: {formatDate(patient.date_of_birth)} • {patient.email || 'No email'}</div>
  <div className="mt-2 flex gap-2">
  <span className="px-2 py-0.5 rounded-[6px] text-[11px] font-bold bg-gray-100 text-gray-600">
  {patient.insured_status === 'privat_versichert' ? 'Privat' : 'Selbstzahler/Gesetzlich'}
@@ -261,7 +262,7 @@ export default function WizardStep4({
  <div className="text-[13px] space-y-2 text-gray-700">
  <div><span className="font-semibold">Method:</span> <span className="capitalize">{collectionLabels[deliveryInfo.method] || 'Not specified'}</span></div>
  <div><span className="font-semibold">Results:</span> <span className="capitalize">{deliveryLabels[deliveryInfo.results] || 'Not specified'}</span></div>
- <div><span className="font-semibold">Expected:</span> {deliveryInfo.expectedDate ? new Date(deliveryInfo.expectedDate).toLocaleDateString() : 'Not specified'}</div>
+ <div><span className="font-semibold">Expected:</span> {deliveryInfo.expectedDate ? formatDate(deliveryInfo.expectedDate) : 'Not specified'}</div>
  <div><span className="font-semibold">Billing:</span> <span className={billingMode === 'doctor' ? 'text-primary font-semibold' : ''}>{billingMode === 'doctor' ? 'Doctor pays (monthly invoice)' : 'Patient pays'}</span></div>
  </div>
  </div>

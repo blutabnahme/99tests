@@ -95,6 +95,110 @@ async function stepMaterials(orderId: string, recommendationId: string): Promise
 }
 
 // ============================================================
+// STEP: Create shipments (one per lab)
+// ============================================================
+
+async function createShipments(
+  orderId: string,
+  recommendationId: string,
+  supabase: any
+): Promise<{ success: boolean; shipment_count: number; error?: string }> {
+  try {
+    // Check if shipments already exist for this order
+    const { data: existing } = await supabase
+      .from('tt_order_shipment')
+      .select('id')
+      .eq('order_id', orderId);
+    
+    if (existing && existing.length > 0) {
+      return { success: true, shipment_count: existing.length };
+    }
+
+    // Fetch recommendation items with test + lab info
+    const { data: items } = await supabase
+      .from('tt_recommendation_item')
+      .select(`
+        id, test_id, quantity,
+        test:test_id(id, name, sku, sample_shipping, lab:lab_id(id, name))
+      `)
+      .eq('recommendation_id', recommendationId);
+
+    if (!items || items.length === 0) {
+      return { success: true, shipment_count: 0 };
+    }
+
+    // Determine shipping method: if ANY test has sample_shipping containing 'gologistik', all go via GoLogistik
+    const hasGoLogistik = items.some((item: any) => {
+      const shipping = (item.test?.sample_shipping || '').toLowerCase();
+      return shipping.includes('gologistik') || shipping.includes('go!') || shipping.includes('go logistik');
+    });
+    const shippingMethod = hasGoLogistik ? 'gologistik' : 'standard';
+
+    // Group tests by lab
+    const labGroups = new Map<string, { lab_id: string; lab_name: string; tests: any[] }>();
+    for (const item of items) {
+      const labId = item.test?.lab?.id;
+      const labName = item.test?.lab?.name || 'Unknown';
+      if (!labId) continue;
+      
+      if (!labGroups.has(labId)) {
+        labGroups.set(labId, { lab_id: labId, lab_name: labName, tests: [] });
+      }
+      labGroups.get(labId)!.tests.push({
+        test_id: item.test_id,
+        test_name: item.test?.name || '',
+        test_sku: item.test?.sku || '',
+      });
+    }
+
+    // Fetch calculated materials to attach to each shipment
+    const { data: materials } = await supabase
+      .from('tt_recommendation_material')
+      .select(`
+        *,
+        material:material_id(id, code, name),
+        laboratory:laboratory_id(id, name)
+      `)
+      .eq('recommendation_id', recommendationId);
+
+    // Create one shipment per lab
+    const shipments = [];
+    for (const [labId, group] of labGroups) {
+      // Get materials for this lab
+      const labMaterials = (materials || [])
+        .filter((m: any) => m.laboratory_id === labId)
+        .map((m: any) => ({
+          material_name: m.material?.name || '',
+          material_code: m.material?.code || '',
+          tube_count: m.calculated_tube_count || 1,
+        }));
+
+      shipments.push({
+        order_id: orderId,
+        laboratory_id: labId,
+        shipping_method: shippingMethod,
+        status: shippingMethod === 'standard' ? 'pending' : 'awaiting_schedule',
+        tests: group.tests,
+        materials: labMaterials,
+      });
+    }
+
+    if (shipments.length > 0) {
+      const { error: insertErr } = await supabase
+        .from('tt_order_shipment')
+        .insert(shipments);
+      
+      if (insertErr) throw insertErr;
+    }
+
+    return { success: true, shipment_count: shipments.length };
+  } catch (err: any) {
+    console.error('[Shipments] Creation failed:', err);
+    return { success: false, shipment_count: 0, error: err.message };
+  }
+}
+
+// ============================================================
 // STEP 2: ANAMNESE PDF (PLACEHOLDER)
 // ============================================================
 
@@ -327,6 +431,10 @@ export async function runOrderPreparation(orderId: string): Promise<{
   // Step 1: Materials
   steps.materials = await stepMaterials(orderId, recommendationId);
   if (steps.materials.status === 'failed') errors.push(`Materials: ${steps.materials.error}`);
+
+  // After materials step, before DHL:
+  const shipmentResult = await createShipments(orderId, order.recommendation_id, supabaseAdmin);
+  console.log(`[Pipeline] Shipments: ${shipmentResult.shipment_count} created, method: ${shipmentResult.success ? 'ok' : shipmentResult.error}`);
 
   // Step 2: Anamnese PDF
   steps.anamnese_pdf = await stepAnamnesePdf(orderId, recommendationId);

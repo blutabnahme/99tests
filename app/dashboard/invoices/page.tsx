@@ -7,23 +7,17 @@ import {
   AlertTriangle, FileText, Download
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-
-function formatDate(iso: string): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
-}
-
+import { formatDate } from '@/lib/format-date';
 function formatCurrency(n: number): string {
   return `€${Number(n || 0).toFixed(2)}`;
 }
 
 function getMonthLabel(date: Date): string {
-  return date.toLocaleString('en', { month: 'short' });
+  return formatDate(date.toISOString());
 }
 
 function getMonthYearLabel(date: Date): string {
-  return date.toLocaleString('en', { month: 'long', year: 'numeric' });
+  return formatDate(date.toISOString());
 }
 
 function getMonthKey(date: Date): string {

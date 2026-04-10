@@ -18,6 +18,7 @@ import {
  Send
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { formatDate } from '@/lib/format-date';
 
 export default function MatchingShortlistClient({ caseInfo, initialCollectors }: { caseInfo: any, initialCollectors: any[] }) {
  const [collectors, setCollectors] = useState(initialCollectors);
@@ -290,7 +291,7 @@ export default function MatchingShortlistClient({ caseInfo, initialCollectors }:
  <div className="w-px h-3.5 bg-gray-200" />
  <div className="flex items-center gap-1.5">
  <FileText className="w-3.5 h-3.5 text-steel-500" />
- <span className="text-[12px] font-semibold text-steel-600">{bc.collections.toLocaleString()}</span>
+ <span className="text-[12px] font-semibold text-steel-600">{formatDate(bc.collections)}</span>
  </div>
  <div className="w-px h-3.5 bg-gray-200" />
  <div className="flex items-center gap-1.5">

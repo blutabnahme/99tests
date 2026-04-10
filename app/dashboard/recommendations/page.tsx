@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { formatDistanceToNow } from 'date-fns';
 import { ConfirmModal } from '@/components/shared/ConfirmModal';
+import { formatDate } from '@/lib/format-date';
 
 // Helper debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -522,7 +523,7 @@ export default function RecommendationsList() {
  €{Number(row.calculated_total || 0).toFixed(2)}
  </td>
  <td className="py-4 text-center group/date relative cursor-help" onClick={() => router.push(`/dashboard/recommendations/${row.id}`)}>
- <div className="text-[13px] text-gray-900">{new Date(row.created_at).toLocaleDateString()}</div>
+ <div className="text-[13px] text-gray-900">{formatDate(row.created_at)}</div>
  <div className="text-[11px] text-gray-400 absolute left-1/2 -translate-x-1/2 opacity-0 group-hover/date:opacity-100 transition-opacity bg-white px-1.5 py-0.5 -mt-6 rounded border shadow-sm w-max z-10">
  {formatDistanceToNow(new Date(row.created_at), { addSuffix: true })}
  </div>

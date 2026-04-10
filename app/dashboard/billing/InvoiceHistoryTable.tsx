@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useTranslations } from "next-intl";
+import { formatDate } from '@/lib/format-date';
 
 type PaymentRow = {
  id: string;
@@ -82,7 +83,7 @@ export default function InvoiceHistoryTable({ invoices }: { invoices: InvoiceRow
  </div>
  </td>
  <td className="py-4 px-6 text-[13px] text-gray-500 font-medium whitespace-nowrap">
- {new Date(inv.period_start).toLocaleDateString()} &mdash; {new Date(inv.period_end).toLocaleDateString()}
+ {formatDate(inv.period_start)} &mdash; {formatDate(inv.period_end)}
  </td>
  <td className="py-4 px-6 text-[14px] font-bold text-near-black">{inv.case_count}</td>
  <td className="py-4 px-6 text-[13px] text-gray-500">€{inv.org_fees_total.toFixed(2)}</td>
@@ -122,7 +123,7 @@ export default function InvoiceHistoryTable({ invoices }: { invoices: InvoiceRow
  <tbody>
  {inv.payments.map((p) => (
  <tr key={p.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
- <td className="py-3 px-4 text-[12px] text-gray-500 font-medium">{new Date(p.date).toLocaleDateString()}</td>
+ <td className="py-3 px-4 text-[12px] text-gray-500 font-medium">{formatDate(p.date)}</td>
  <td className="py-3 px-4 text-[12px] font-bold text-near-black">{p.patientName}</td>
  <td className="py-3 px-4">
  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider ${
@@ -166,7 +167,7 @@ export default function InvoiceHistoryTable({ invoices }: { invoices: InvoiceRow
  {inv.invoice_number}
  </div>
  <div className="text-[12px] text-gray-500 font-medium mt-1">
- {new Date(inv.period_start).toLocaleDateString()} &mdash; {new Date(inv.period_end).toLocaleDateString()}
+ {formatDate(inv.period_start)} &mdash; {formatDate(inv.period_end)}
  </div>
  </div>
  <StatusBadge status={inv.status} />

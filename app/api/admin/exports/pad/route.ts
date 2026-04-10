@@ -1,34 +1,88 @@
 export const dynamic = 'force-dynamic';
-import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { runPadExport } from '@/lib/pad-xml-generator';
 
-export async function POST(request: Request) {
+import { NextRequest, NextResponse } from 'next/server';
+import { generatePadBatchExport } from '@/lib/pad-xml-generator';
+import { createClient } from '@supabase/supabase-js';
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+/**
+ * POST /api/admin/exports/pad
+ * 
+ * Body: { order_ids: string[] } — specific orders to export
+ *   OR: { date_from: string, date_to: string } — date range
+ *   OR: { lab_name: string } — all unexported orders for a specific lab
+ * 
+ * Returns XML file(s) as JSON with download URLs or inline XML content.
+ */
+export async function POST(request: NextRequest) {
   try {
-    const supabaseClient = createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-
-    if (authError || !user || user.user_metadata?.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const body = await request.json();
-    const { date_start, date_end, lab_id, include_exported } = body;
-
-    if (!date_start || !date_end) {
-      return NextResponse.json({ error: 'Start and end dates are required' }, { status: 400 });
+    const supabase = getSupabaseAdmin();
+    
+    let orderIds: string[] = [];
+    
+    if (body.order_ids && Array.isArray(body.order_ids)) {
+      orderIds = body.order_ids;
+    } else {
+      // Build query for orders with PAD data
+      let query = supabase
+        .from('tt_order')
+        .select('id')
+        .not('pad_pvs_data', 'is', null);
+      
+      if (body.date_from) {
+        query = query.gte('created_at', body.date_from);
+      }
+      if (body.date_to) {
+        query = query.lte('created_at', body.date_to);
+      }
+      
+      const { data: orders, error } = await query;
+      if (error) throw error;
+      orderIds = (orders || []).map(o => o.id);
     }
-
-    const result = await runPadExport({
-      dateStart: date_start,
-      dateEnd: date_end,
-      labId: lab_id || undefined,
-      includeExported: include_exported || false,
+    
+    if (orderIds.length === 0) {
+      return NextResponse.json({ error: 'No orders found for export' }, { status: 404 });
+    }
+    
+    // Generate PAD XML
+    const result = await generatePadBatchExport(orderIds);
+    
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 500 });
+    }
+    
+    // If single file, return XML directly
+    if (result.files.length === 1) {
+      const file = result.files[0];
+      return new NextResponse(file.xml, {
+        headers: {
+          'Content-Type': 'application/xml; charset=utf-8',
+          'Content-Disposition': \`attachment; filename="\${file.filename}"\`,
+        },
+      });
+    }
+    
+    // Multiple files — return as JSON with content
+    return NextResponse.json({
+      success: true,
+      files: result.files.map(f => ({
+        lab_name: f.labName,
+        filename: f.filename,
+        xml: f.xml,
+        order_count: f.xml.split('<rechnung ').length - 1,
+      })),
     });
-
-    return NextResponse.json(result);
-  } catch (error: any) {
-    console.error('PAD export error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    
+  } catch (err: any) {
+    console.error('[PAD Export] Error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

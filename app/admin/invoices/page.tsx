@@ -9,11 +9,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { createPortal } from 'react-dom';
 
-function formatDate(iso: string): string {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
-}
+import { formatDate } from '@/lib/format-date';
 
 function formatCurrency(n: number): string {
   return `€${Number(n || 0).toFixed(2)}`;
@@ -136,7 +132,7 @@ export default function AdminInvoicesPage() {
               const [year, month] = genMonth.split('-').map(Number);
               const periodStart = new Date(year, month - 1, 1);
               const periodEnd = new Date(year, month, 0, 23, 59, 59);
-              if (!confirm(`Generate invoices for ${periodStart.toLocaleString('en', { month: 'long', year: 'numeric' })}?`)) return;
+              if (!confirm(`Generate invoices for ${formatDate(periodStart.toISOString())}?`)) return;
               setGenerating(true);
               try {
                 const res = await fetch('/api/admin/invoices/generate', {

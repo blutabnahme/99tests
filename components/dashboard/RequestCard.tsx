@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { MapPin, CalendarDays, AlertTriangle, Check, X, Clock } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { formatDate } from '@/lib/format-date';
 
 export function RequestCard({ appointment }: { appointment: any }) {
  const [status, setStatus] = useState<"pending" | "accepted" | "declined" | "counter_proposed">("pending");
@@ -42,7 +43,6 @@ export function RequestCard({ appointment }: { appointment: any }) {
  }
 
  const { case: recommendationData, patient } = appointment;
- const d = new Date(appointment.scheduled_at);
 
  return (
  <Card className="bg-white hover:shadow-md transition-shadow">
@@ -63,7 +63,7 @@ export function RequestCard({ appointment }: { appointment: any }) {
  <div className="bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-lg flex items-center gap-2">
  <CalendarDays className="w-4 h-4" />
  <span className="font-bold text-[14px]">
- {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} {t('at')} {d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+ {formatDate(appointment.scheduled_at, { includeTime: true })}
  </span>
  </div>
  </div>

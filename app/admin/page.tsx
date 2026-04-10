@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import OrderKanban from '@/components/admin/OrderKanban';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 function formatCurrency(n: number): string {
   return `€${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
@@ -59,22 +60,68 @@ function MetricCard({ label, value, subtitle, icon: Icon, trend, trendLabel }: {
 
 function RevenueChart({ data }: { data: any[] }) {
   if (!data || data.length === 0) return null;
+  
+  const totalRevenue = data.reduce((sum, d) => sum + (d.revenue || 0), 0);
+  const totalOrders = data.reduce((sum, d) => sum + (d.orders || 0), 0);
+  
   return (
     <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-6 overflow-hidden">
-      <h2 className="font-heading font-medium text-[16px] text-near-black mb-6 flex justify-between items-center">
-        <span>Revenue Chart</span>
-        <span className="text-[12px] font-medium bg-gray-100 px-2 py-1 rounded-full text-gray-500">Last 30 Days</span>
-      </h2>
-      <div className="h-[180px] flex items-end gap-1 outline-none w-full border-b border-gray-100 pb-2">
-        {data.map((d, i) => (
-          <div key={i} className="flex-1 flex flex-col items-center gap-2 group relative">
-            <div className="w-full bg-primary/30 rounded-t-sm group-hover:bg-primary transition-colors cursor-pointer" style={{ height: `${d.percentage || 10}%`, minHeight: '4px' }} />
-            <div className="absolute top-full mt-2 text-[10px] text-gray-400 -rotate-45 origin-top-left -ml-2 select-none whitespace-nowrap opacity-0 md:opacity-100">{d.label}</div>
-            <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] py-1 px-2 rounded-lg whitespace-nowrap transition-opacity pointer-events-none z-10">€{d.value}</div>
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h2 className="font-heading font-medium text-[16px] text-near-black">Revenue</h2>
+          <div className="flex items-baseline gap-3 mt-1">
+            <span className="text-[22px] font-heading font-medium text-near-black">€{totalRevenue.toFixed(2)}</span>
+            <span className="text-[13px] text-gray-400">{totalOrders} order(s)</span>
           </div>
-        ))}
+        </div>
+        <span className="text-[12px] font-medium bg-gray-100 px-2 py-1 rounded-full text-gray-500">Last 30 Days</span>
       </div>
-      <div className="h-10"></div>
+      <div className="h-[180px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#008085" stopOpacity={0.2} />
+                <stop offset="100%" stopColor="#008085" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+            <XAxis 
+              dataKey="date" 
+              axisLine={false} 
+              tickLine={false} 
+              tick={{ fontSize: 10, fill: '#9CA3AF' }}
+              interval={4}
+            />
+            <YAxis 
+              axisLine={false} 
+              tickLine={false} 
+              tick={{ fontSize: 10, fill: '#9CA3AF' }}
+              tickFormatter={(v) => v > 0 ? `€${v}` : ''}
+              width={45}
+            />
+            <Tooltip 
+              contentStyle={{ 
+                borderRadius: '12px', 
+                border: '1px solid #E5E7EB', 
+                fontSize: '12px',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+              }}
+              formatter={(value: number) => [`€${value.toFixed(2)}`, 'Revenue']}
+              labelStyle={{ fontWeight: 500, marginBottom: 4 }}
+            />
+            <Area 
+              type="monotone" 
+              dataKey="revenue" 
+              stroke="#008085" 
+              strokeWidth={2}
+              fill="url(#revenueGradient)"
+              dot={false}
+              activeDot={{ r: 4, fill: '#008085', strokeWidth: 0 }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }

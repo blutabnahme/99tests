@@ -4,6 +4,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Loader2, Building, User, FileText, AlertCircle, RefreshCw } from 'lucide-react';
+import { formatDate } from '@/lib/format-date';
 
 export default function AdminNewCasePage() {
  const router = useRouter();
@@ -301,7 +302,7 @@ export default function AdminNewCasePage() {
  className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
  >
  <div className="text-[14px] font-medium text-near-black">{p.first_name} {p.last_name}</div>
- <div className="text-[12px] text-gray-500">{p.email || 'No email provided'} {p.date_of_birth ? `· DOB: ${new Date(p.date_of_birth).toLocaleDateString()}` : ''}</div>
+ <div className="text-[12px] text-gray-500">{p.email || 'No email provided'} {p.date_of_birth ? `· DOB: ${formatDate(p.date_of_birth)}` : ''}</div>
  </div>
  ))
  ) : (

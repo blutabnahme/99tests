@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, Edit2, User, Phone, Mail, MapPin, ShieldCheck, HeartPulse, FileText, AlertTriangle } from "lucide-react";
 import { PatientModal } from "@/components/dashboard/PatientModal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { formatDate } from '@/lib/format-date';
 
 export default function PatientDetailPage() {
  const router = useRouter();
@@ -152,7 +153,7 @@ export default function PatientDetailPage() {
  <User className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
  <div>
  <div className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-0.5">Date of Birth</div>
- <div className="text-[14px] font-medium text-near-black">{new Date(patient.date_of_birth).toLocaleDateString()}</div>
+ <div className="text-[14px] font-medium text-near-black">{formatDate(patient.date_of_birth)}</div>
  </div>
  </div>
 
@@ -288,7 +289,7 @@ export default function PatientDetailPage() {
  €{total.toFixed(2)}
  </td>
  <td className="px-6 py-4 font-body text-[13px] text-gray-500">
- {new Date(rec.created_at).toLocaleDateString()}
+ {formatDate(rec.created_at)}
  </td>
  </tr>
  );

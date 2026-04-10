@@ -53,10 +53,21 @@ export async function GET(request: Request, context: any) {
       .eq('recommendation_id', order.recommendation_id)
       .order('laboratory_id', { ascending: true });
 
+    // Fetch shipments
+    const { data: shipments } = await supabaseAdmin
+      .from('tt_order_shipment')
+      .select(`
+        *,
+        laboratory:laboratory_id(id, name, address_city)
+      `)
+      .eq('order_id', params.id)
+      .order('created_at', { ascending: true });
+
     return NextResponse.json({
       ...order,
       items: items || [],
       calculated_materials: materials || [],
+      shipments: shipments || [],
     });
   } catch (error: any) {
     console.error('GET admin order detail error:', error);

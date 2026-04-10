@@ -8,6 +8,7 @@ import Link from "next/link";
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useDoctor } from "@/components/providers/DoctorProvider";
 import { useRouter } from "next/navigation";
+import { formatDate } from '@/lib/format-date';
 
 const KANBAN_COLUMNS = [
   { id: 'draft', label: 'Draft', matches: ['created'], icon: FileEdit, color: 'gray' },
@@ -36,12 +37,6 @@ interface DashboardData {
     status_counts: Record<string, number>;
   };
   recent_recommendations: any[];
-}
-
-function formatDateShort(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 function StatCard({ label, value, icon: Icon, href }: { label: string; value: string; icon: any; href?: string }) {
@@ -265,7 +260,7 @@ export default function DoctorDashboardPage() {
                                             <div className="text-[13px] font-medium text-gray-800 truncate">{rec.patientName}</div>
                                             <div className="flex items-center justify-between mt-0.5">
                                               <span className="text-[11px] font-mono text-primary font-semibold">{rec.display_id}</span>
-                                              <span className="text-[11px] text-gray-400">{rec.expected_appointment_date ? formatDateShort(rec.expected_appointment_date) : formatDateShort(rec.created_at)}</span>
+                                              <span className="text-[11px] text-gray-400">{rec.expected_appointment_date ? formatDate(rec.expected_appointment_date) : formatDate(rec.created_at)}</span>
                                             </div>
                                           </div>
                                         </div>
@@ -327,7 +322,7 @@ export default function DoctorDashboardPage() {
                         <td className="px-6 py-3 font-mono text-[13px] text-primary font-semibold">{rec.display_id}</td>
                         <td className="px-6 py-3"><StatusBadge status={rec.status} /></td>
                         <td className="px-6 py-3 text-gray-500">{rec.testsCount} test{rec.testsCount !== 1 ? 's' : ''}</td>
-                        <td className="px-6 py-3 text-gray-500 text-[13px]">{new Date(rec.created_at).toLocaleDateString('de-DE')}</td>
+                        <td className="px-6 py-3 text-gray-500 text-[13px]">{formatDate(rec.created_at)}</td>
                       </tr>
                     ))}
                     {(!data?.recent_recommendations || data.recent_recommendations.length === 0) && (

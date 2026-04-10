@@ -16,6 +16,7 @@ const ORDER_STATUSES = [
   { value: 'at_lab', label: 'At Lab' },
   { value: 'results_ready', label: 'Results Ready' },
   { value: 'completed', label: 'Completed' },
+  { value: 'has_resend', label: 'Has Resend' },
 ];
 
 const PAYMENT_METHODS = [
@@ -23,6 +24,7 @@ const PAYMENT_METHODS = [
   { value: 'credit_card', label: 'Credit Card' },
   { value: 'sepa', label: 'SEPA' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'doctor_invoice', label: 'Doctor Invoice' },
 ];
 
 function formatDate(iso: string): string {
@@ -37,6 +39,9 @@ function formatPaymentMethod(method: string): string {
     card: 'Credit Card',
     sepa: 'SEPA',
     bank_transfer: 'Bank Transfer',
+    bank: 'Bank Transfer',
+    doctor_invoice: 'Doctor Invoice',
+    mock: 'Mock',
     paypal: 'PayPal',
   };
   return map[method] || method || '-';
@@ -290,8 +295,28 @@ export default function OrdersPage() {
                       <div className="font-semibold text-near-black">{order.patient?.first_name} {order.patient?.last_name}</div>
                       <div className="text-[12px] text-gray-500">{order.patient?.email}</div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600 truncate max-w-[150px]">
-                      {order.doctor?.full_name || '-'}
+                    <td className="px-6 py-4 text-gray-600 text-[13px]">
+                      <span className="group relative cursor-default">
+                        <span>
+                          {(() => {
+                            const name = order.doctor?.full_name || '-';
+                            const parts = name.split(' ');
+                            if (parts.length <= 2) return name;
+                            // Keep title (Dr., Dr. med., Prof.) + last name
+                            const titles = [];
+                            let i = 0;
+                            while (i < parts.length && (parts[i].endsWith('.') || parts[i] === 'med' || parts[i] === 'Prof')) {
+                              titles.push(parts[i]);
+                              i++;
+                            }
+                            const lastName = parts[parts.length - 1];
+                            return titles.length > 0 ? `${titles.join(' ')} ${lastName}` : name;
+                          })()}
+                        </span>
+                        <span className="invisible group-hover:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-50 px-2.5 py-1 text-[11px] font-medium text-white bg-gray-800 rounded-lg whitespace-nowrap shadow-lg">
+                          {order.doctor?.full_name || ''}
+                        </span>
+                      </span>
                     </td>
                     <td className="px-6 py-4 font-mono text-gray-900">
                       {order.total != null ? `€${Number(order.total).toFixed(2)}` : '-'}
@@ -303,7 +328,12 @@ export default function OrdersPage() {
                       <StatusBadge status={order.status || 'preparing'} />
                     </td>
                     <td className="px-6 py-4">
-                      <PipelineDotsIndicator status={order.preparation_status} />
+                      <div className="flex items-center gap-1.5">
+                        <PipelineDotsIndicator status={order.preparation_status} />
+                        {order.resend_count > 0 && (
+                          <span className="text-amber-500 text-[11px]" title={`${order.resend_count} resend(s)`}>↻</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-gray-500 text-[13px]">
                       {formatDate(order.created_at)}
@@ -345,7 +375,9 @@ export default function OrdersPage() {
                     <span className="font-mono text-[13px] text-primary font-semibold">{order.display_id || order.id?.substring(0, 8)}</span>
                     <div className="font-semibold text-near-black text-[15px] mt-0.5">{order.patient?.first_name} {order.patient?.last_name}</div>
                   </div>
-                  <StatusBadge status={order.status || 'preparing'} />
+                  <div className="flex flex-col items-end">
+                    <StatusBadge status={order.status || 'preparing'} />
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 text-[13px] text-gray-500">
                   <span className="font-mono">€{Number(order.total || 0).toFixed(2)}</span>
@@ -354,8 +386,11 @@ export default function OrdersPage() {
                   <span className="text-gray-300">•</span>
                   <span>{formatDate(order.created_at)}</span>
                 </div>
-                <div className="mt-2">
+                <div className="mt-2 flex items-center gap-1.5">
                   <PipelineDotsIndicator status={order.preparation_status} />
+                  {order.resend_count > 0 && (
+                    <span className="text-amber-500 text-[11px]" title={`${order.resend_count} resend(s)`}>↻</span>
+                  )}
                 </div>
               </Link>
             ))}

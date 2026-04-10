@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { CheckCircle2, FileText, Download, User } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import Link from "next/link";
+import { formatDate } from '@/lib/format-date';
 
 const supabaseAdmin = createClient(
  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
@@ -61,7 +62,7 @@ export default async function ReceiptPage({ params }: { params: { token: string 
  </div>
  <div className="flex flex-col text-[13px]">
  <span className="text-gray-500 font-medium">{t('date')}</span>
- <span className="font-bold text-near-black">{paymentRecord?.paid_at ? new Date(paymentRecord.paid_at).toLocaleString() : new Date().toLocaleString()}</span>
+ <span className="font-bold text-near-black">{paymentRecord?.paid_at ? formatDate(paymentRecord.paid_at) : new Date().toLocaleString()}</span>
  </div>
  <div className="flex flex-col text-[13px]">
  <span className="text-gray-500 font-medium">{t('caseRef')}</span>

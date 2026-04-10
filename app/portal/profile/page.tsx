@@ -3,12 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Mail, Phone, MapPin, Shield, Calendar, Loader2, CheckCircle2 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-
-function formatDate(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+import { formatDate } from '@/lib/format-date';
 
 export default function PortalProfilePage() {
   const [patient, setPatient] = useState<any>(null);
@@ -138,7 +133,7 @@ export default function PortalProfilePage() {
           </div>
           <div>
             <div className="text-[18px] font-heading font-medium text-near-black">{form.first_name} {form.last_name}</div>
-            <div className="text-[13px] text-gray-500">Patient since {patient.created_at ? new Date(patient.created_at).toLocaleDateString('en', { month: 'long', year: 'numeric' }) : '-'}</div>
+            <div className="text-[13px] text-gray-500">Patient since {patient.created_at ? formatDate(patient.created_at) : '-'}</div>
           </div>
         </div>
 

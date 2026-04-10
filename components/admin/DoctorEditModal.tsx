@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Loader2, User, MapPin, Settings, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { formatDate } from '@/lib/format-date';
 
 interface DoctorEditModalProps {
   doctor: any;
@@ -467,7 +468,7 @@ export default function DoctorEditModal({ doctor, onClose, onSuccess }: DoctorEd
                     {doctor.verified_at && (
                       <div className="flex justify-between">
                         <span className="text-gray-500">Verified at</span>
-                        <span className="text-gray-700">{new Date(doctor.verified_at).toLocaleDateString('de-DE')}</span>
+                        <span className="text-gray-700">{formatDate(doctor.verified_at)}</span>
                       </div>
                     )}
                     {doctor.rejection_reason && (

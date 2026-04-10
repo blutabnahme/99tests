@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Building2, Home, Search, MoreHorizontal, Eye, Copy, XCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronDown, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from 'next-intl';
+import { formatDate } from '@/lib/format-date';
 
 export function CasesOverviewTable({ recommendations }: { recommendations: any[] }) {
  const router = useRouter();
@@ -211,7 +212,7 @@ export function CasesOverviewTable({ recommendations }: { recommendations: any[]
  )}
  </td>
  <td className="px-6 py-4 text-[13px] font-medium text-gray-500">
- {new Date(c.created_at).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' })}
+ {formatDate(c.created_at)}
  </td>
  <td className="px-6 py-4 text-right relative" onClick={handleDropdownClick}>
  {/* Custom simple dropdown via hover/focus-within */}
@@ -276,7 +277,7 @@ export function CasesOverviewTable({ recommendations }: { recommendations: any[]
  <StatusBadge status={c.status} />
  </div>
  <div className="flex items-center gap-4 mt-2 text-[12px] text-gray-500">
- <span>{new Date(c.created_at).toLocaleDateString("en-GB", { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+ <span>{formatDate(c.created_at)}</span>
  {c.urgency_level && <span className="capitalize">{c.urgency_level === 'emergency' ? t('emergency') : c.urgency_level === 'urgent' ? t('urgent') : t('normal')}</span>}
  <span>{c.applicationCount === 1 ? t('applicant', { count: 1 }) : t('applicants', { count: c.applicationCount })}</span>
  </div>
