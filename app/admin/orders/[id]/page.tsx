@@ -7,8 +7,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Loader2, ArrowLeft, CheckCircle2, Clock, AlertCircle, XCircle,
-  Package, FileText, FileCode, Receipt, Truck,
-  Download, RefreshCw, User, Users, Stethoscope, CreditCard, MapPin, Building2,
+  Package, FileText, FileCode, Receipt, Truck, FlaskConical,
+  Download, Upload, RefreshCw, User, Users, Stethoscope, CreditCard, MapPin, Building2,
   ChevronDown, ChevronRight, ChevronLeft, ArrowRight, Image as ImageIcon, Check, RotateCcw, ClipboardList, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -76,6 +76,7 @@ function StepStatusIcon({ status }: { status: string }) {
   }
 }
 
+
 export default function OrderDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [order, setOrder] = useState<any>(null);
@@ -87,7 +88,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [rerunning, setRerunning] = useState(false);
   const [shipments, setShipments] = useState<any[]>([]);
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<'overview' | 'preparation' | 'shipments' | 'files' | 'timeline'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'preparation' | 'shipments' | 'files' | 'results' | 'timeline'>('overview');
   const [showResendModal, setShowResendModal] = useState(false);
   const [resendReason, setResendReason] = useState('');
   const [resendNotes, setResendNotes] = useState('');
@@ -97,6 +98,55 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const [resendStep, setResendStep] = useState<1 | 2>(1);
   const [showActivityDrawer, setShowActivityDrawer] = useState(false);
   const [closingDrawer, setClosingDrawer] = useState(false);
+
+  const [results, setResults] = useState<any[]>([]);
+  const [showUploadResultModal, setShowUploadResultModal] = useState(false);
+  const [resultsLoading, setResultsLoading] = useState(false);
+
+  const [uploadStep, setUploadStep] = useState(1);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadLabId, setUploadLabId] = useState('');
+  const [uploadSelectedTests, setUploadSelectedTests] = useState<any[]>([]);
+  const [uploadVisibility, setUploadVisibility] = useState('doctor_and_patient');
+  const [uploadAdminNotes, setUploadAdminNotes] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  const availableLabs = [...new Map(
+    [
+      // From recommendation items (test → lab)
+      ...(order?.items || [])
+        .filter((item: any) => item.test?.laboratory?.id)
+        .map((item: any) => [item.test.laboratory.id, { id: item.test.laboratory.id, name: item.test.laboratory.name || 'Unknown' }]),
+      // Fallback: from shipments (if items don't have lab data)
+      ...(shipments || [])
+        .filter((s: any) => s.laboratory_id && s.laboratory)
+        .map((s: any) => [s.laboratory_id, { id: s.laboratory_id, name: s.laboratory?.name || 'Unknown' }]),
+    ]
+  ).values()];
+
+  const fetchResults = async () => {
+    if (!params?.id) return;
+    setResultsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${params.id}/results`);
+      if (res.ok) {
+        const data = await res.json();
+        setResults(data.results || []);
+      }
+    } catch {}
+    finally { setResultsLoading(false); }
+  };
+
+  const getResultsCoverage = (): number => {
+    const allCoveredTestIds = new Set<string>();
+    results.forEach((r: any) => {
+      (r.tests_covered || []).forEach((t: any) => {
+        if (t.test_id) allCoveredTestIds.add(t.test_id);
+      });
+    });
+    return allCoveredTestIds.size;
+  };
 
   const toggleStep = (key: string) => {
     setExpandedSteps(prev => ({ ...prev, [key]: !prev[key] }));
@@ -214,6 +264,12 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     fetchResends(); 
     fetchShipments();
   }, [params.id]);
+
+  useEffect(() => {
+    if (activeTab === 'results' && order?.id) {
+      fetchResults();
+    }
+  }, [activeTab, order?.id]);
 
   const handleConfirmPayment = async () => {
     setConfirmingPayment(true);
@@ -608,6 +664,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             { key: 'preparation', label: 'Preparation' },
             { key: 'shipments', label: 'Shipments' },
             { key: 'files', label: 'Files' },
+            { key: 'results', label: 'Results' },
             { key: 'timeline', label: 'Timeline' },
           ];
           return tabs.map(tab => (
@@ -624,6 +681,11 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
               {tab.key === 'shipments' && resends.filter((r: any) => r.status === 'created' || r.status === 'shipped').length > 0 && (
                 <span className="min-w-[18px] h-[18px] flex items-center justify-center text-[9px] font-bold bg-amber-100 text-amber-600 rounded-full px-1">
                   {resends.filter((r: any) => r.status === 'created' || r.status === 'shipped').length}
+                </span>
+              )}
+              {tab.key === 'results' && results.filter((r: any) => r.status === 'doctor_reviewing').length > 0 && (
+                <span className="min-w-[18px] h-[18px] flex items-center justify-center text-[9px] font-bold bg-amber-100 text-amber-600 rounded-full px-1">
+                  {results.filter((r: any) => r.status === 'doctor_reviewing').length}
                 </span>
               )}
             </button>
@@ -1273,6 +1335,162 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             </div>
           )}
 
+          {activeTab === 'results' && (
+            <div className="space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading font-medium text-[15px] text-near-black">Lab Results</h3>
+                  {order.items && (
+                    <p className="text-[12px] text-gray-400 mt-0.5">
+                      {getResultsCoverage()} of {order.items.length} test{order.items.length !== 1 ? 's' : ''} have results
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => { setUploadStep(1); setUploadFile(null); setUploadLabId(''); setUploadSelectedTests([]); setUploadVisibility(order.recommendation?.results_delivery || 'doctor_and_patient'); setUploadAdminNotes(''); setShowUploadResultModal(true); }}
+                  className="px-4 py-2 rounded-full bg-[#008085] text-white hover:bg-[#005C5F] text-[13px] font-medium transition-colors flex items-center gap-2"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Upload Results
+                </button>
+              </div>
+
+              {/* Results Coverage Overview */}
+              {order.items && order.items.length > 0 && (
+                <div className="bg-gray-50 rounded-[12px] p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[#008085] rounded-full transition-all"
+                        style={{ width: `${(getResultsCoverage() / (order.items?.length || 1)) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-[13px] font-medium text-gray-600 shrink-0">
+                      {getResultsCoverage()}/{order.items.length}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {order.items.map((item: any) => {
+                      const testId = item.test_id || item.id;
+                      const testName = item.test?.name || item.name || 'Unknown';
+                      const hasCoverage = results.some((r: any) =>
+                        (r.tests_covered || []).some((t: any) => t.test_id === testId)
+                      );
+                      return (
+                        <span
+                          key={testId}
+                          className={`text-[12px] px-2.5 py-1 rounded-full ${
+                            hasCoverage
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-white text-gray-500 border border-gray-200'
+                          }`}
+                        >
+                          {hasCoverage && <span className="mr-1">✓</span>}
+                          {testName}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Results List */}
+              {resultsLoading ? (
+                <div className="py-8 flex justify-center"><LoadingSpinner size="lg" /></div>
+              ) : results.length > 0 ? (
+                <div className="space-y-2">
+                  {results.map((result: any) => (
+                    <div key={result.id} className="flex items-center gap-3 p-4 rounded-[12px] border border-gray-200 hover:border-primary/30 transition-colors">
+                      <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5 text-emerald-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[14px] font-medium text-near-black truncate">{result.file_name}</span>
+                          <span className={`text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                            result.status === 'released' ? 'bg-green-50 text-green-700' :
+                            result.status === 'doctor_reviewing' ? 'bg-amber-50 text-amber-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {result.status === 'released' ? 'Released' :
+                             result.status === 'doctor_reviewing' ? 'Doctor Review' :
+                             'Uploaded'}
+                          </span>
+                          <span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                            result.visibility === 'doctor_and_patient' ? 'bg-blue-50 text-blue-600' :
+                            result.visibility === 'doctor_only' ? 'bg-purple-50 text-purple-600' :
+                            'bg-teal-50 text-teal-600'
+                          }`}>
+                            {result.visibility === 'doctor_and_patient' ? 'Doctor & Patient' :
+                             result.visibility === 'doctor_only' ? 'Doctor Only' :
+                             'Patient Only'}
+                          </span>
+                        </div>
+                        <div className="text-[12px] text-gray-400 mt-0.5 truncate">
+                          {result.laboratory?.name || 'Unknown lab'}
+                          {result.tests_covered?.length > 0 && (
+                            <span> · Tests: {result.tests_covered.map((t: any) => t.test_name || t.name).join(', ')}</span>
+                          )}
+                          <span> · {formatDate(result.created_at)}</span>
+                          {result.file_size_bytes && (
+                            <span> · {(result.file_size_bytes / 1024).toFixed(0)} KB</span>
+                          )}
+                        </div>
+                        {result.admin_notes && (
+                          <div className="text-[12px] text-gray-400 mt-0.5 italic">Note: {result.admin_notes}</div>
+                        )}
+                        {result.doctor_notes && (
+                          <div className="text-[12px] text-blue-500 mt-0.5">Doctor: {result.doctor_notes}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/admin/orders/${order.id}/results/${result.id}/download`);
+                              if (!res.ok) throw new Error('Failed');
+                              const data = await res.json();
+                              window.open(data.url, '_blank');
+                            } catch (err: any) {
+                              alert('Download error: ' + err.message);
+                            }
+                          }}
+                          className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                          title="Download"
+                        >
+                          <Download className="w-4 h-4 text-gray-400" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!confirm('Delete this result file?')) return;
+                            try {
+                              const res = await fetch(`/api/admin/orders/${order.id}/results/${result.id}`, { method: 'DELETE' });
+                              if (!res.ok) throw new Error('Failed');
+                              setResults(prev => prev.filter(r => r.id !== result.id));
+                            } catch (err: any) {
+                              alert('Delete error: ' + err.message);
+                            }
+                          }}
+                          className="w-8 h-8 rounded-full hover:bg-red-50 flex items-center justify-center transition-colors"
+                          title="Delete"
+                        >
+                          <X className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-10 text-center border border-dashed border-gray-200 rounded-[12px]">
+                  <FileText className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                  <p className="text-[14px] text-gray-400">No results uploaded yet</p>
+                  <p className="text-[12px] text-gray-300 mt-1">Upload lab result PDFs to share with the doctor and patient</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'timeline' && (
             <div className="space-y-0">
               <h3 className="font-heading font-medium text-[15px] text-near-black mb-4">Activity</h3>
@@ -1564,6 +1782,379 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
         </div>,
         document.body
       )}
+
+      {/* Upload Result Modal */}
+      {showUploadResultModal && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-0" style={{ backgroundColor: 'rgba(26, 29, 35, 0.5)' }} onClick={() => setShowUploadResultModal(false)}>
+          <div className="bg-white rounded-[16px] shadow-xl max-w-lg w-full mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-heading font-medium text-[18px] text-near-black">Upload Results</h3>
+                <p className="text-[12px] text-gray-400 mt-0.5">Order {order.display_id}</p>
+              </div>
+              <button onClick={() => setShowUploadResultModal(false)} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+
+            {/* Step Indicator */}
+            <div className="px-6 pt-4 pb-2 flex items-center gap-3">
+              {[
+                { num: 1, label: 'File & Lab' },
+                { num: 2, label: 'Tests' },
+                { num: 3, label: 'Delivery' },
+              ].map((s, i) => (
+                <React.Fragment key={s.num}>
+                  {i > 0 && <div className="w-8 h-[2px] bg-gray-200" />}
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
+                      uploadStep === s.num ? 'bg-[#008085] text-white' :
+                      uploadStep > s.num ? 'bg-[#008085]/15 text-[#008085]' :
+                      'bg-gray-200 text-gray-400'
+                    }`}>
+                      {uploadStep > s.num ? '✓' : s.num}
+                    </div>
+                    <span className={`text-[12px] font-medium ${
+                      uploadStep === s.num ? 'text-near-black' : 'text-gray-400'
+                    }`}>{s.label}</span>
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* Step Content */}
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+
+              {/* STEP 1: File & Lab */}
+              {uploadStep === 1 && (
+                <div className="space-y-5">
+                  {/* File Drop Zone */}
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 uppercase tracking-wider mb-2 block">Result File (PDF)</label>
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOver(false);
+                        const dropped = e.dataTransfer.files[0];
+                        if (dropped?.type === 'application/pdf') setUploadFile(dropped);
+                      }}
+                      className={`border-2 border-dashed rounded-[12px] p-8 text-center cursor-pointer transition-colors ${
+                        dragOver ? 'border-[#008085] bg-[#008085]/5' :
+                        uploadFile ? 'border-emerald-300 bg-emerald-50' :
+                        'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => document.getElementById('result-file-input')?.click()}
+                    >
+                      {uploadFile ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <FileText className="w-5 h-5 text-emerald-500" />
+                          <span className="text-[14px] text-near-black font-medium">{uploadFile.name}</span>
+                          <span className="text-[12px] text-gray-400">({(uploadFile.size / 1024).toFixed(0)} KB)</span>
+                          <button onClick={(e) => { e.stopPropagation(); setUploadFile(null); }} className="ml-2">
+                            <X className="w-4 h-4 text-gray-400 hover:text-red-500" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                          <p className="text-[14px] text-gray-500">Drop PDF here or click to browse</p>
+                          <p className="text-[12px] text-gray-400 mt-1">Maximum 10MB</p>
+                        </>
+                      )}
+                    </div>
+                    <input
+                      id="result-file-input"
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) setUploadFile(f);
+                      }}
+                    />
+                  </div>
+
+                  {/* Lab Selector */}
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 uppercase tracking-wider mb-2 block">Laboratory</label>
+                    {availableLabs.length === 0 ? (
+                      <p className="text-[13px] text-gray-400">No laboratories found for this order.</p>
+                    ) : availableLabs.length === 1 ? (
+                      <div className="px-4 py-3 rounded-[12px] bg-gray-50 border border-gray-200 text-[14px] text-near-black">
+                        {availableLabs[0].name}
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {availableLabs.map((lab: any) => (
+                          <label
+                            key={lab.id}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-[12px] cursor-pointer transition-colors ${
+                              uploadLabId === lab.id ? 'bg-[#008085]/5 border border-[#008085]/20' : 'hover:bg-gray-50 border border-gray-200'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="upload-lab"
+                              value={lab.id}
+                              checked={uploadLabId === lab.id}
+                              onChange={() => { setUploadLabId(lab.id); setUploadSelectedTests([]); }}
+                              className="hidden"
+                            />
+                            <span className="text-[14px] text-near-black">{lab.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: Test Selection */}
+              {uploadStep === 2 && (
+                <div className="space-y-4">
+                  <p className="text-[13px] text-gray-500">Select which tests this result file covers.</p>
+
+                  {/* Select All / None */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        const uncovered = (order.items || []).filter((item: any) => {
+                          const testId = item.test?.id || item.test_id || item.id;
+                          return !results.some((r: any) => (r.tests_covered || []).some((t: any) => t.test_id === testId));
+                        });
+                        setUploadSelectedTests(uncovered);
+                      }}
+                      className="text-[12px] text-[#008085] font-medium hover:underline"
+                    >
+                      Select all available
+                    </button>
+                    <span className="text-gray-300">|</span>
+                    <button
+                      onClick={() => setUploadSelectedTests([])}
+                      className="text-[12px] text-gray-400 font-medium hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                    {(order.items || []).map((item: any) => {
+                      const testId = item.test?.id || item.test_id || item.id;
+                      const testName = item.test?.name || item.name || 'Unknown test';
+                      const alreadyCovered = results.some((r: any) =>
+                        (r.tests_covered || []).some((t: any) => t.test_id === testId)
+                      );
+                      const isSelected = uploadSelectedTests.some((t: any) => (t.test?.id || t.test_id || t.id) === testId);
+
+                      return (
+                        <label
+                          key={testId}
+                          className={`flex items-center gap-3 px-4 py-3 rounded-[12px] cursor-pointer transition-colors ${
+                            alreadyCovered ? 'bg-gray-50 opacity-60 cursor-not-allowed' :
+                            isSelected ? 'bg-[#008085]/5 border border-[#008085]/20' :
+                            'hover:bg-gray-50 border border-transparent'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={alreadyCovered}
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setUploadSelectedTests(prev => [...prev, item]);
+                              } else {
+                                setUploadSelectedTests(prev => prev.filter(t => (t.test?.id || t.test_id || t.id) !== testId));
+                              }
+                            }}
+                            className="rounded text-[#008085] focus:ring-[#008085]"
+                          />
+                          <span className={`text-[14px] ${alreadyCovered ? 'text-gray-400 line-through' : 'text-near-black'}`}>
+                            {testName}
+                          </span>
+                          {alreadyCovered && (
+                            <span className="text-[11px] text-emerald-500 ml-auto flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> Has results
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-[12px] text-gray-400 mt-2">
+                    {uploadSelectedTests.length} test{uploadSelectedTests.length !== 1 ? 's' : ''} selected
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: Delivery & Notes */}
+              {uploadStep === 3 && (
+                <div className="space-y-5">
+                  {/* Summary */}
+                  <div className="bg-gray-50 rounded-[12px] p-4">
+                    <div className="text-[12px] font-medium text-gray-500 uppercase tracking-wider mb-2">Summary</div>
+                    <div className="text-[13px] text-gray-600 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-gray-400" />
+                        <span>{uploadFile?.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <FlaskConical className="w-3.5 h-3.5 text-gray-400" />
+                        <span>{uploadSelectedTests.length} test{uploadSelectedTests.length !== 1 ? 's' : ''}: {uploadSelectedTests.map((t: any) => t.test?.name || t.name || 'Unknown').join(', ')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Visibility */}
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 uppercase tracking-wider mb-2 block">Results Delivery</label>
+                    <div className="space-y-1.5">
+                      {[
+                        { value: 'doctor_and_patient', label: 'Doctor and Patient', desc: 'Both receive results immediately' },
+                        { value: 'doctor_only', label: 'Doctor only', desc: 'Patient will not see these results' },
+                        { value: 'patient_only', label: 'Patient only', desc: 'Doctor will not be notified' },
+                      ].map((opt) => (
+                        <label
+                          key={opt.value}
+                          className={`flex items-start gap-3 px-4 py-3 rounded-[12px] cursor-pointer transition-colors ${
+                            uploadVisibility === opt.value ? 'bg-[#008085]/5 border border-[#008085]/20' : 'hover:bg-gray-50 border border-gray-200'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="upload-visibility"
+                            value={opt.value}
+                            checked={uploadVisibility === opt.value}
+                            onChange={() => setUploadVisibility(opt.value)}
+                            className="hidden"
+                          />
+                          <div>
+                            <span className="text-[14px] font-medium text-near-black">{opt.label}</span>
+                            <span className="text-[12px] text-gray-400 block">{opt.desc}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Admin Notes */}
+                  <div>
+                    <label className="text-[12px] font-medium text-gray-500 uppercase tracking-wider mb-2 block">Admin Notes (optional)</label>
+                    <textarea
+                      value={uploadAdminNotes}
+                      onChange={(e) => setUploadAdminNotes(e.target.value)}
+                      placeholder="Internal notes about this result..."
+                      rows={2}
+                      className="w-full rounded-[12px] border border-gray-200 px-4 py-2.5 text-[14px] resize-none focus:border-[#008085] focus:ring-1 focus:ring-[#008085] outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer with Navigation */}
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-between">
+              {uploadStep === 1 ? (
+                <>
+                  <div />
+                  <button
+                    onClick={() => {
+                      if (!uploadFile) { alert('Please select a PDF file.'); return; }
+                      if (availableLabs.length === 1) setUploadLabId(availableLabs[0].id);
+                      if (availableLabs.length > 1 && !uploadLabId) { alert('Please select a laboratory.'); return; }
+                      setUploadStep(2);
+                    }}
+                    className="px-5 py-2.5 text-[13px] font-medium text-white bg-[#008085] hover:bg-[#005C5F] rounded-full transition-colors"
+                  >
+                    Next: Select Tests →
+                  </button>
+                </>
+              ) : uploadStep === 2 ? (
+                <>
+                  <button
+                    onClick={() => setUploadStep(1)}
+                    className="px-5 py-2.5 text-[13px] font-medium text-gray-500 hover:text-near-black transition-colors rounded-full border border-gray-200 hover:border-gray-300"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (uploadSelectedTests.length === 0) { alert('Please select at least one test.'); return; }
+                      setUploadStep(3);
+                    }}
+                    className="px-5 py-2.5 text-[13px] font-medium text-white bg-[#008085] hover:bg-[#005C5F] rounded-full transition-colors"
+                  >
+                    Next: Delivery →
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setUploadStep(2)}
+                    className="px-5 py-2.5 text-[13px] font-medium text-gray-500 hover:text-near-black transition-colors rounded-full border border-gray-200 hover:border-gray-300"
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setUploading(true);
+                      try {
+                        const formData = new FormData();
+                        formData.append('file', uploadFile!);
+                        formData.append('laboratory_id', uploadLabId);
+                        formData.append('tests_covered', JSON.stringify(uploadSelectedTests.map((t: any) => ({
+                          test_id: t.test?.id || t.test_id || t.id,
+                          test_name: t.test?.name || t.name || 'Unknown'
+                        }))));
+                        formData.append('visibility', uploadVisibility);
+                        formData.append('auto_release', 'true');
+                        formData.append('admin_notes', uploadAdminNotes);
+
+                        const res = await fetch(`/api/admin/orders/${order.id}/results`, {
+                          method: 'POST',
+                          body: formData,
+                        });
+
+                        if (!res.ok) {
+                          const data = await res.json();
+                          throw new Error(data.error || 'Upload failed');
+                        }
+
+                        const data = await res.json();
+                        setResults(prev => [data.result, ...prev]);
+                        setShowUploadResultModal(false);
+                      } catch (err: any) {
+                        alert('Upload error: ' + err.message);
+                      } finally {
+                        setUploading(false);
+                      }
+                    }}
+                    disabled={uploading}
+                    className="px-5 py-2.5 text-[13px] font-medium text-white bg-[#008085] hover:bg-[#005C5F] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5" />
+                        Upload Result
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Re-run Pipeline Modal */}
       {showRerunModal && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-0" style={{ backgroundColor: 'rgba(26, 29, 35, 0.5)' }} onClick={() => setShowRerunModal(false)}>

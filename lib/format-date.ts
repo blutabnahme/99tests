@@ -10,7 +10,7 @@
 export function formatDate(input: string, options?: { includeTime?: boolean }): string {
   if (!input) return '-';
 
-  const str = input.trim();
+  const str = String(input).trim();
 
   // Date-only format: YYYY-MM-DD (no time component)
   const dateOnlyMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);

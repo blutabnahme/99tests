@@ -3,7 +3,7 @@
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 import { useEffect, useState, useMemo } from "react";
-import { Plus, Users, LayoutList, LayoutGrid, Send, CreditCard, Truck, FlaskConical, FileCheck, FileEdit, Clock, ClipboardList, ArrowRight } from "lucide-react";
+import { Plus, Users, LayoutList, LayoutGrid, Send, CreditCard, Truck, FlaskConical, FileCheck, FileEdit, Clock, ClipboardList, ArrowRight, Download, CheckCircle2, FileText } from "lucide-react";
 import Link from "next/link";
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useDoctor } from "@/components/providers/DoctorProvider";
@@ -82,8 +82,30 @@ export default function DoctorDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'results'>('kanban');
   const [listSort, setListSort] = useState('date_desc');
+
+  const [reviewResults, setReviewResults] = useState<any[]>([]);
+  const [recentResults, setRecentResults] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchResults() {
+      try {
+        const reviewRes = await fetch('/api/doctor/results?status=doctor_reviewing');
+        if (reviewRes.ok) {
+          const data = await reviewRes.json();
+          setReviewResults(data.results || []);
+        }
+
+        const recentRes = await fetch('/api/doctor/results?limit=20');
+        if (recentRes.ok) {
+          const data = await recentRes.json();
+          setRecentResults(data.results || []);
+        }
+      } catch {}
+    }
+    fetchResults();
+  }, []);
 
   const [collapsedCols, setCollapsedCols] = useState<Set<string>>(new Set());
 
@@ -162,6 +184,14 @@ export default function DoctorDashboardPage() {
               }`}
             >
               <LayoutList className="w-4 h-4" /> List
+            </button>
+            <button
+              onClick={() => setViewMode('results')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
+                viewMode === 'results' ? 'bg-[#E6F7F5] text-primary' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <FileCheck className="w-4 h-4" /> Results
             </button>
           </div>
           <Link
@@ -341,6 +371,145 @@ export default function DoctorDashboardPage() {
           )}
 
           {/* Bottom Cards */}
+          {viewMode === 'results' && (
+            <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-6 mb-6">
+              
+              {reviewResults.length > 0 && (
+                <div className="mb-8">
+                  <h3 className="font-heading font-medium text-[15px] text-near-black mb-3 text-amber-700 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" /> Action Required
+                  </h3>
+                  <div className="space-y-3">
+                    {reviewResults.map((result: any) => (
+                      <div key={result.id} className="bg-white rounded-[16px] border border-amber-200 shadow-sm p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <span className="font-mono text-[13px] text-[#008085] font-semibold">{result.order?.display_id}</span>
+                            <span className="text-[13px] text-gray-500 ml-2">
+                              {result.order?.patient?.first_name} {result.order?.patient?.last_name}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                            Pending Review
+                          </span>
+                        </div>
+                  
+                        <div className="text-[14px] text-near-black mb-1">
+                          Tests: {(result.tests_covered || []).map((t: any) => t.test_name || t.name).join(', ')}
+                        </div>
+                        <div className="text-[12px] text-gray-400 flex items-center gap-1.5">
+                          {result.laboratory?.name} <span className="text-gray-300">·</span> {formatDate(result.created_at)}
+                        </div>
+                  
+                        {/* Doctor Notes Input */}
+                        <div className="mt-3">
+                          <textarea
+                            placeholder="Add notes for the patient (optional)..."
+                            defaultValue={result.doctor_notes || ''}
+                            onBlur={async (e) => {
+                              const notes = e.target.value;
+                              try {
+                                await fetch(`/api/doctor/results/${result.id}/notes`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ notes }),
+                                });
+                              } catch {}
+                            }}
+                            rows={2}
+                            className="w-full rounded-[12px] border border-gray-200 px-4 py-2.5 text-[13px] resize-none focus:border-[#008085] focus:ring-1 focus:ring-[#008085] outline-none"
+                          />
+                        </div>
+                  
+                        <div className="flex items-center gap-2 mt-3">
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/doctor/results/${result.id}/download`);
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  window.open(data.url, '_blank');
+                                }
+                              } catch {}
+                            }}
+                            className="px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 text-[13px] font-medium transition-colors flex items-center gap-2"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            View PDF
+                          </button>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const res = await fetch(`/api/doctor/results/${result.id}/release`, { method: 'PATCH' });
+                                if (res.ok) {
+                                  // Remove from review list, add to recent
+                                  setReviewResults(prev => prev.filter(r => r.id !== result.id));
+                                  setRecentResults(prev => [result, ...prev.filter(r => r.id !== result.id)]);
+                                }
+                              } catch {}
+                            }}
+                            className="px-4 py-2 rounded-full bg-[#008085] text-white hover:bg-[#005C5F] text-[13px] font-medium transition-colors flex items-center gap-2"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Release to Patient
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2 mt-6">
+                <h3 className="font-heading font-medium text-[15px] text-near-black mb-3">Recent Results</h3>
+                {recentResults.length === 0 ? (
+                  <div className="text-center py-6 text-[13px] text-gray-400 border border-dashed border-gray-200 rounded-[12px]">No recent results found.</div>
+                ) : (
+                  recentResults.map((result: any) => (
+                    <div key={result.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded-[12px]">
+                      <div className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4 text-emerald-500" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[14px] font-medium text-near-black">
+                            {result.order?.display_id} — {result.order?.patient?.first_name} {result.order?.patient?.last_name}
+                          </span>
+                          <span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                            result.status === 'released' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'
+                          }`}>
+                            {result.status === 'released' ? 'Released' : 'Uploaded'}
+                          </span>
+                        </div>
+                        <div className="text-[12px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          Tests: {(result.tests_covered || []).map((t: any) => t.test_name || t.name).join(', ')}
+                          <span className="text-gray-300">·</span> {result.laboratory?.name} <span className="text-gray-300">·</span> {formatDate(result.created_at)}
+                        </div>
+                        {result.doctor_notes && (
+                          <div className="text-[12px] text-blue-500 mt-0.5 font-medium">Your note: {result.doctor_notes}</div>
+                        )}
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch(`/api/doctor/results/${result.id}/download`);
+                            if (res.ok) {
+                              const data = await res.json();
+                              window.open(data.url, '_blank');
+                            }
+                          } catch {}
+                        }}
+                        className="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center transition-colors shrink-0"
+                      >
+                        <Download className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Recent Patients */}
             <div className="bg-white border border-gray-200 rounded-[16px] p-5">

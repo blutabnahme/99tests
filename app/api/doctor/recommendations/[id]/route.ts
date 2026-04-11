@@ -41,7 +41,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
  .select(`
  *,
  patient:patient_id(*),
- order:tt_order(payment_method),
+ order:tt_order(id, payment_method),
  items:tt_recommendation_item(
  id, quantity, unit_price, lab_cost, test_type,
  test:test_id(*, laboratory:tt_laboratory(name))

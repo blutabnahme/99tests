@@ -37,9 +37,18 @@ export default function PortalDoctorsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {doctors.map((doc: any) => {
-            const nameParts = (doc.full_name || '').split(' ');
+            const rawParts = (doc.full_name || '').split(' ');
+            const titlePrefixes = [
+              'dr.', 'dr', 'med.', 'med', 'prof.', 'prof', 'pd', 'pd.',
+              'dipl.', 'dipl', 'mag.', 'mag', 'habil.', 'habil',
+              'dent.', 'dent', 'rer.', 'rer', 'nat.', 'nat',
+              'phil.', 'phil', 'jur.', 'jur', 'ing.', 'ing',
+              'oec.', 'oec', 'theol.', 'theol', 'vet.', 'vet',
+              'h.c.', 'mult.', 'mult', 'univ.', 'univ',
+            ];
+            const nameParts = rawParts.filter((p: string) => !titlePrefixes.includes(p.toLowerCase()));
             const firstName = nameParts[0] || '';
-            const lastName = nameParts[nameParts.length - 1] || '';
+            const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
             const initials = `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
 
             return (

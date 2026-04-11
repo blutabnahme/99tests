@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Toast } from '@/components/shared/Toast';
-import { ChevronLeft, ArrowLeft, Loader2, Edit2, Trash2, Send, Mail, CheckCircle2, Check, Copy, MessageCircle, Link2, Pencil } from 'lucide-react';
+import { ChevronLeft, ArrowLeft, Loader2, Edit2, Trash2, Send, Mail, CheckCircle2, Check, Copy, MessageCircle, Link2, Pencil, Download, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmModal } from '@/components/shared/ConfirmModal';
@@ -27,6 +27,9 @@ export default function RecommendationDetail({ params }: { params: { id: string 
  const [data, setData] = useState<any>(null);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState<string | null>(null);
+
+ const [orderResults, setOrderResults] = useState<any[]>([]);
+ const [resultsLoading, setResultsLoading] = useState(false);
  
  const [isDeleting, setIsDeleting] = useState(false);
  const [isSending, setIsSending] = useState(false);
@@ -54,6 +57,26 @@ export default function RecommendationDetail({ params }: { params: { id: string 
  };
  fetchDetail();
  }, [params.id]);
+
+ useEffect(() => {
+   const orderId = data?.order?.id || data?.order?.[0]?.id;
+   if (!orderId) return;
+
+   const fetchResults = async () => {
+     setResultsLoading(true);
+     try {
+       const res = await fetch('/api/doctor/results');
+       if (res.ok) {
+         const json = await res.json();
+         // Filter to only results for this order
+         const filtered = (json.results || []).filter((r: any) => r.order_id === orderId);
+         setOrderResults(filtered);
+       }
+     } catch {}
+     finally { setResultsLoading(false); }
+   };
+   fetchResults();
+ }, [data]);
 
  const handleDelete = async () => {
     try {
@@ -178,7 +201,7 @@ export default function RecommendationDetail({ params }: { params: { id: string 
  {data.status === 'cancelled' ? (
   <div className="min-w-[600px] relative flex items-center justify-between">
    <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-gray-200 z-0"></div>
-   {['Draft', 'Sent', 'Paid', 'Shipped', 'Collecting', 'At Lab', 'Results'].map((label, i) => (
+   {['Draft', 'Sent', 'Paid', 'Shipped', 'At Lab', 'Results'].map((label, i) => (
     <div key={label} className="relative z-10 flex flex-col items-center">
      <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-[11px] font-bold z-10">
       {i + 1}
@@ -201,17 +224,31 @@ export default function RecommendationDetail({ params }: { params: { id: string 
  style={{
  width: `${(() => {
  const isBankTransfer = data.order?.[0]?.payment_method === 'bank_transfer' || data.order?.payment_method === 'bank_transfer';
+ const baseSteps = [
+ { id: 'created', label: 'Draft' },
+ { id: 'sent', label: 'Sent' }
+ ];
+ if (isBankTransfer || data.status === 'awaiting_payment') {
+ baseSteps.push({ id: 'awaiting_payment', label: 'Awaiting Payment' });
+ }
+ baseSteps.push(
+ { id: 'paid', label: 'Paid' },
+ { id: 'shipped', label: 'Shipped' },
+ { id: 'at_lab', label: 'At Lab' },
+ { id: 'results_ready', label: 'Results' }
+ );
+
  const statusMapping: Record<string, number> = {
  created: 0, sent: 1, 
  awaiting_payment: 2,
- paid: isBankTransfer ? 3 : 2, 
- preparing: isBankTransfer ? 4 : 3, kit_shipped: isBankTransfer ? 4 : 3, 
- collection_organized: isBankTransfer ? 5 : 4, awaiting_collection: isBankTransfer ? 5 : 4, 
- returning_to_lab: isBankTransfer ? 6 : 5, at_lab: isBankTransfer ? 6 : 5, 
- results_ready: isBankTransfer ? 7 : 6, completed: isBankTransfer ? 7 : 6
+ paid: baseSteps.findIndex(s => s.id === 'paid'), 
+ preparing: baseSteps.findIndex(s => s.id === 'shipped'), kit_shipped: baseSteps.findIndex(s => s.id === 'shipped'), 
+ collection_organized: baseSteps.findIndex(s => s.id === 'shipped'), awaiting_collection: baseSteps.findIndex(s => s.id === 'shipped'), 
+ returning_to_lab: baseSteps.findIndex(s => s.id === 'at_lab'), at_lab: baseSteps.findIndex(s => s.id === 'at_lab'), 
+ results_ready: baseSteps.findIndex(s => s.id === 'results_ready'), completed: baseSteps.findIndex(s => s.id === 'results_ready')
  };
  const currentIdx = statusMapping[data.status] ?? 0;
- return (currentIdx / (isBankTransfer ? 7 : 6)) * 100;
+ return (currentIdx / (baseSteps.length - 1)) * 100;
  })()}%`
  }}
  ></div>
@@ -228,7 +265,6 @@ export default function RecommendationDetail({ params }: { params: { id: string 
  baseSteps.push(
  { id: 'paid', label: 'Paid' },
  { id: 'shipped', label: 'Shipped' },
- { id: 'collecting', label: 'Collecting' },
  { id: 'at_lab', label: 'At Lab' },
  { id: 'results_ready', label: 'Results' }
  );
@@ -238,7 +274,7 @@ export default function RecommendationDetail({ params }: { params: { id: string 
  awaiting_payment: 2,
  paid: baseSteps.findIndex(s => s.id === 'paid'), 
  preparing: baseSteps.findIndex(s => s.id === 'shipped'), kit_shipped: baseSteps.findIndex(s => s.id === 'shipped'), 
- collection_organized: baseSteps.findIndex(s => s.id === 'collecting'), awaiting_collection: baseSteps.findIndex(s => s.id === 'collecting'), 
+ collection_organized: baseSteps.findIndex(s => s.id === 'shipped'), awaiting_collection: baseSteps.findIndex(s => s.id === 'shipped'), 
  returning_to_lab: baseSteps.findIndex(s => s.id === 'at_lab'), at_lab: baseSteps.findIndex(s => s.id === 'at_lab'), 
  results_ready: baseSteps.findIndex(s => s.id === 'results_ready'), completed: baseSteps.findIndex(s => s.id === 'results_ready')
  };
@@ -435,8 +471,126 @@ export default function RecommendationDetail({ params }: { params: { id: string 
  </div>
  )}
  </div>
-
  </div>
+
+ {/* Lab Results Section */}
+ {(data?.order?.id || data?.order?.[0]?.id) && (
+  <div className="mt-6">
+    <div className="p-6 rounded-[16px] bg-gray-50/50 border border-gray-100">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-[12px] font-bold text-gray-400 uppercase tracking-widest">Lab Results</h3>
+        {orderResults.length > 0 && (
+          <span className="text-[12px] text-gray-400">
+            {orderResults.length} result{orderResults.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      {resultsLoading ? (
+        <div className="py-6 flex justify-center"><LoadingSpinner size="lg" /></div>
+      ) : orderResults.length > 0 ? (
+        <div className="space-y-3">
+          {orderResults.map((result: any) => (
+            <div key={result.id} className="flex items-center gap-4 p-4 bg-white rounded-[12px] border border-gray-100">
+              <div className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0">
+                <FileText className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px] font-medium text-near-black">
+                    {(result.tests_covered || []).map((t: any) => t.test_name || t.name).join(', ') || result.file_name}
+                  </span>
+                  <span className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                    result.status === 'released' ? 'bg-green-50 text-green-700' :
+                    result.status === 'doctor_reviewing' ? 'bg-amber-50 text-amber-700' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    {result.status === 'released' ? 'Released' :
+                     result.status === 'doctor_reviewing' ? 'Pending Review' :
+                     'Uploaded'}
+                  </span>
+                </div>
+                <div className="text-[12px] text-gray-400 mt-0.5">
+                  {result.laboratory?.name || ''} · {formatDate(result.created_at)}
+                </div>
+                {result.doctor_notes && (
+                  <div className="text-[12px] text-blue-500 mt-1">Your note: {result.doctor_notes}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+                {/* Add Notes */}
+                <button
+                  onClick={() => {
+                    const notes = prompt('Add notes for the patient:', result.doctor_notes || '');
+                    if (notes !== null) {
+                      fetch(`/api/doctor/results/${result.id}/notes`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ notes }),
+                      }).then(() => {
+                        setOrderResults(prev => prev.map(r =>
+                          r.id === result.id ? { ...r, doctor_notes: notes } : r
+                        ));
+                      });
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 text-[12px] font-medium transition-colors"
+                >
+                  {result.doctor_notes ? 'Edit Note' : 'Add Note'}
+                </button>
+
+                {/* Download */}
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/doctor/results/${result.id}/download`);
+                      if (res.ok) {
+                        const json = await res.json();
+                        window.open(json.url, '_blank');
+                      }
+                    } catch (err: any) {
+                      alert('Download error: ' + err.message);
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-full bg-[#008085] text-white hover:bg-[#005C5F] text-[12px] font-medium transition-colors flex items-center gap-1.5"
+                >
+                  <Download className="w-3 h-3" />
+                  View PDF
+                </button>
+
+                {/* Release (only for doctor_reviewing) */}
+                {result.status === 'doctor_reviewing' && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/doctor/results/${result.id}/release`, { method: 'PATCH' });
+                        if (res.ok) {
+                          setOrderResults(prev => prev.map(r =>
+                            r.id === result.id ? { ...r, status: 'released', released_at: new Date().toISOString() } : r
+                          ));
+                        }
+                      } catch {}
+                    }}
+                    className="px-3 py-1.5 rounded-full bg-emerald-500 text-white hover:bg-emerald-600 text-[12px] font-medium transition-colors flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3 h-3" />
+                    Release
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="py-6 text-center">
+          <FileText className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+          <p className="text-[13px] text-gray-400">No results uploaded yet</p>
+          <p className="text-[12px] text-gray-300 mt-1">Results will appear here once uploaded by the admin</p>
+        </div>
+      )}
+    </div>
+  </div>
+)}
 
  </div>
 
