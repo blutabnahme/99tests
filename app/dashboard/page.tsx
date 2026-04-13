@@ -165,7 +165,7 @@ export default function DoctorDashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-heading font-medium text-near-black">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-1">Welcome back, Dr. {doctor?.full_name}</p>
+          <p className="text-sm text-gray-500 mt-1">Welcome back, {doctor?.full_name}</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="bg-white rounded-full p-1 border border-gray-200 flex items-center">

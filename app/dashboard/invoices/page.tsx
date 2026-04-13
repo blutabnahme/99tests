@@ -13,11 +13,11 @@ function formatCurrency(n: number): string {
 }
 
 function getMonthLabel(date: Date): string {
-  return formatDate(date.toISOString());
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 function getMonthYearLabel(date: Date): string {
-  return formatDate(date.toISOString());
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
 function getMonthKey(date: Date): string {
@@ -50,6 +50,7 @@ export default function DoctorInvoicesPage() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date(now.getFullYear(), now.getMonth(), 1));
   const [navOffset, setNavOffset] = useState(0); // how many months back the visible window starts
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
 
   useEffect(() => {
     async function fetchInvoices() {
@@ -116,13 +117,30 @@ export default function DoctorInvoicesPage() {
     };
   }, [monthInvoice, monthOrders]);
 
-  if (loading) return <div className="flex justify-center py-20"><LoadingSpinner size="md" /></div>;
+  if (loading) return <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>;
   if (error) return <div className="p-4 bg-red-50 text-red-600 rounded-[16px] text-sm border border-red-100">{error}</div>;
 
   const hasContent = monthInvoice || monthOrders.length > 0;
 
   return (
-    <div className="space-y-6 lg:space-y-8">
+    <>
+      <style>{`
+        @keyframes slideFromLeft {
+          from { transform: translateX(-10px); }
+          to { transform: translateX(0); }
+        }
+        @keyframes slideFromRight {
+          from { transform: translateX(10px); }
+          to { transform: translateX(0); }
+        }
+        .animate-slide-left {
+          animation: slideFromLeft 0.15s ease-out;
+        }
+        .animate-slide-right {
+          animation: slideFromRight 0.15s ease-out;
+        }
+      `}</style>
+      <div className="space-y-6 lg:space-y-8">
       {/* Header */}
       <div>
         <h1 className="font-heading font-medium text-[24px] lg:text-[28px] text-near-black tracking-tight" style={{ textTransform: 'none' }}>Invoices</h1>
@@ -181,43 +199,45 @@ export default function DoctorInvoicesPage() {
           </div>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setNavOffset(prev => prev + 1)}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={() => { setSlideDirection('right'); setNavOffset(prev => prev + 1); }}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all duration-150 active:scale-90"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1">
-              {visibleMonths.map(m => {
-                const key = getMonthKey(m);
-                const isSelected = key === selectedKey;
-                const isCurrent = key === currentKey;
-                // Check if month has an invoice
-                const hasInvoice = data?.invoices?.some((inv: any) => getMonthKey(new Date(inv.period_start)) === key);
-                const hasOrders = data?.pending_orders?.some((o: any) => getMonthKey(new Date(o.created_at)) === key);
-                const hasDot = hasInvoice || hasOrders;
+            <div className="overflow-hidden rounded-full bg-gray-100">
+              <div key={`nav-${navOffset}`} className={`flex items-center gap-1 p-1 ${slideDirection === 'left' ? 'animate-slide-left' : slideDirection === 'right' ? 'animate-slide-right' : ''}`}>
+                {visibleMonths.map(m => {
+                  const key = getMonthKey(m);
+                  const isSelected = key === selectedKey;
+                  const isCurrent = key === currentKey;
+                  // Check if month has an invoice
+                  const hasInvoice = data?.invoices?.some((inv: any) => getMonthKey(new Date(inv.period_start)) === key);
+                  const hasOrders = data?.pending_orders?.some((o: any) => getMonthKey(new Date(o.created_at)) === key);
+                  const hasDot = hasInvoice || hasOrders;
 
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setSelectedMonth(m)}
-                    className={`relative px-3 py-1.5 rounded-full text-[12px] font-medium transition-all ${
-                      isSelected
-                        ? 'bg-white text-near-black shadow-sm'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    {getMonthLabel(m)}
-                    {hasDot && !isSelected && (
-                      <span className={`absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${hasInvoice ? 'bg-primary' : 'bg-gray-300'}`} />
-                    )}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setSelectedMonth(m)}
+                      className={`relative px-3 py-1.5 rounded-full text-[12px] font-medium transition-all duration-200 ${
+                        isSelected
+                          ? 'bg-white text-near-black shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {getMonthLabel(m)}
+                      {hasDot && !isSelected && (
+                        <span className={`absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${hasInvoice ? 'bg-primary' : 'bg-gray-300'}`} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <button
-              onClick={() => setNavOffset(prev => Math.max(0, prev - 1))}
+              onClick={() => { setSlideDirection('left'); setNavOffset(prev => Math.max(0, prev - 1)); }}
               disabled={navOffset === 0}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all duration-150 active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -230,7 +250,7 @@ export default function DoctorInvoicesPage() {
             <div className="flex items-center gap-3">
               <InvoiceStatusBadge status={monthInvoice.status} />
               <span className="text-[12px] text-gray-500">
-                {formatDate(monthInvoice.period_start)} – {formatDate(monthInvoice.period_end)}
+                {getMonthYearLabel(new Date(monthInvoice.period_start))}
               </span>
               {monthInvoice.paid_at && (
                 <span className="text-[12px] text-green-600">Paid {formatDate(monthInvoice.paid_at)}</span>
@@ -250,7 +270,7 @@ export default function DoctorInvoicesPage() {
             <p className="text-gray-400 text-[14px]">No orders in this period</p>
           </div>
         ) : (
-          <>
+          <div>
             {/* Orders table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[13px] whitespace-nowrap">
@@ -315,7 +335,7 @@ export default function DoctorInvoicesPage() {
               </div>
               <span className="font-mono font-semibold text-primary text-[20px]">{formatCurrency(viewTotals.total)}</span>
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -327,5 +347,6 @@ export default function DoctorInvoicesPage() {
         </div>
       )}
     </div>
+    </>
   );
 }
