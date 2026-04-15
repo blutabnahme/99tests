@@ -34,6 +34,7 @@ export async function GET() {
         items:tt_doctor_invoice_item(*)
       `)
       .eq('doctor_id', doctor.id)
+      .neq('status', 'issued')
       .order('created_at', { ascending: false });
 
     if (error) throw error;

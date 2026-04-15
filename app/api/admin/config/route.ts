@@ -50,7 +50,15 @@ export async function PUT(request: Request) {
 
     // Only allow specific fields to be updated
     const allowedFields: Record<string, any> = {};
-    const editable = ['service_fee_pct', 'vat_rate', 'shipping_standard', 'shipping_prio', 'shipping_express', 'shipping_gologistik', 'pvs_file_prefix', 'country_zone_mapping', 'doctor_billing_service_fee_pct'];
+    const editable = [
+      'service_fee_pct', 'vat_rate', 'shipping_standard', 'shipping_prio', 'shipping_express', 'shipping_gologistik', 'pvs_file_prefix', 'country_zone_mapping', 'doctor_billing_service_fee_pct',
+      'company_name', 'company_street', 'company_zip_city', 'company_country',
+      'company_email', 'company_phone', 'company_website', 'company_ceo',
+      'company_registry', 'company_tax_id', 'company_ust_id',
+      'company_bank_name', 'bank_iban', 'bank_bic',
+      'invoice_prefix', 'invoice_payment_terms_days', 'billing_period',
+      'invoice_footer_text',
+    ];
 
     for (const key of editable) {
       if (body[key] !== undefined) {

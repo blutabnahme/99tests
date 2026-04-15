@@ -3,7 +3,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { formatDate } from '@/lib/format-date';
 
 import React, { useState, useEffect } from 'react';
-import { Loader2, Save, Settings, Truck, Database, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, Save, Settings, Truck, Database, AlertCircle, CheckCircle2, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 export default function AdminConfigPage() {
@@ -12,7 +12,7 @@ export default function AdminConfigPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [activeTab, setActiveTab] = useState<'pricing' | 'shipping' | 'system'>('pricing');
+  const [activeTab, setActiveTab] = useState<'pricing' | 'shipping' | 'billing' | 'system'>('pricing');
 
   // Form state
   const [serviceFee, setServiceFee] = useState('');
@@ -24,6 +24,27 @@ export default function AdminConfigPage() {
   const [shippingGologistik, setShippingGologistik] = useState('');
   const [pvsPrefix, setPvsPrefix] = useState('');
   const [countryZoneMapping, setCountryZoneMapping] = useState('');
+
+  // Billing state
+  const [companyName, setCompanyName] = useState('');
+  const [companyStreet, setCompanyStreet] = useState('');
+  const [companyZip, setCompanyZip] = useState('');
+  const [companyCity, setCompanyCity] = useState('');
+  const [companyCountry, setCompanyCountry] = useState('');
+  const [companyEmail, setCompanyEmail] = useState('');
+  const [companyPhone, setCompanyPhone] = useState('');
+  const [companyWebsite, setCompanyWebsite] = useState('');
+  const [companyCeo, setCompanyCeo] = useState('');
+  const [companyRegistry, setCompanyRegistry] = useState('');
+  const [companyTaxId, setCompanyTaxId] = useState('');
+  const [companyUstId, setCompanyUstId] = useState('');
+  const [companyBankName, setCompanyBankName] = useState('');
+  const [bankIban, setBankIban] = useState('');
+  const [bankBic, setBankBic] = useState('');
+  const [invoicePrefix, setInvoicePrefix] = useState('');
+  const [invoicePaymentTerms, setInvoicePaymentTerms] = useState('');
+  const [billingPeriod, setBillingPeriod] = useState('monthly');
+  const [invoiceFooterText, setInvoiceFooterText] = useState('');
 
   const fetchConfig = async () => {
     setLoading(true);
@@ -41,6 +62,33 @@ export default function AdminConfigPage() {
       setShippingGologistik(String(data.shipping_gologistik ?? ''));
       setPvsPrefix(data.pvs_file_prefix || '');
       setCountryZoneMapping(data.country_zone_mapping ? JSON.stringify(data.country_zone_mapping, null, 2) : '{}');
+
+      setCompanyName(data.company_name || '');
+      setCompanyStreet(data.company_street || '');
+      const zipCity = data.company_zip_city || '';
+      const zipMatch = zipCity.match(/^(\d{4,5})\s*(.*)/);
+      if (zipMatch) {
+        setCompanyZip(zipMatch[1]);
+        setCompanyCity(zipMatch[2]);
+      } else {
+        setCompanyZip('');
+        setCompanyCity(zipCity);
+      }
+      setCompanyCountry(data.company_country || '');
+      setCompanyEmail(data.company_email || '');
+      setCompanyPhone(data.company_phone || '');
+      setCompanyWebsite(data.company_website || '');
+      setCompanyCeo(data.company_ceo || '');
+      setCompanyRegistry(data.company_registry || '');
+      setCompanyTaxId(data.company_tax_id || '');
+      setCompanyUstId(data.company_ust_id || '');
+      setCompanyBankName(data.company_bank_name || '');
+      setBankIban(data.bank_iban || '');
+      setBankBic(data.bank_bic || '');
+      setInvoicePrefix(data.invoice_prefix || '');
+      setInvoicePaymentTerms(String(data.invoice_payment_terms_days || ''));
+      setBillingPeriod(data.billing_period || 'monthly');
+      setInvoiceFooterText(data.invoice_footer_text || '');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -76,6 +124,24 @@ export default function AdminConfigPage() {
           shipping_gologistik: parseFloat(shippingGologistik) || 0,
           pvs_file_prefix: pvsPrefix,
           country_zone_mapping: parsedZoneMapping,
+          company_name: companyName,
+          company_street: companyStreet,
+          company_zip_city: `${companyZip} ${companyCity}`.trim(),
+          company_country: companyCountry,
+          company_email: companyEmail,
+          company_phone: companyPhone,
+          company_website: companyWebsite,
+          company_ceo: companyCeo,
+          company_registry: companyRegistry,
+          company_tax_id: companyTaxId,
+          company_ust_id: companyUstId,
+          company_bank_name: companyBankName,
+          bank_iban: bankIban,
+          bank_bic: bankBic,
+          invoice_prefix: invoicePrefix,
+          invoice_payment_terms_days: parseInt(invoicePaymentTerms) || 14,
+          billing_period: billingPeriod,
+          invoice_footer_text: invoiceFooterText,
         }),
       });
 
@@ -104,6 +170,7 @@ export default function AdminConfigPage() {
 
   const tabs = [
     { id: 'pricing' as const, label: 'Pricing', icon: Settings },
+    { id: 'billing' as const, label: 'Billing', icon: Receipt },
     { id: 'shipping' as const, label: 'Shipping', icon: Truck },
     { id: 'system' as const, label: 'System', icon: Database },
   ];
@@ -237,6 +304,139 @@ export default function AdminConfigPage() {
                     Total: €{(100 + (100 * (parseFloat(doctorBillingFee) || 0)) / 100 + 5 + ((parseFloat(doctorBillingFee) || 0) + 5) * (parseFloat(vatRate) || 0) / 100).toFixed(2)}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* BILLING TAB */}
+        {activeTab === 'billing' && (
+          <div className="space-y-8">
+            {/* Company Information */}
+            <div>
+              <h2 className="font-heading font-medium text-[16px] text-near-black mb-1" style={{ textTransform: 'none' }}>Company Information</h2>
+              <p className="text-[13px] text-gray-500 mb-4">Used on invoices and official documents.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Row 1 */}
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Company Name</label>
+                  <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} className={inputClasses} placeholder="Wir sind Immun GmbH" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Managing Director</label>
+                  <input type="text" value={companyCeo} onChange={e => setCompanyCeo(e.target.value)} className={inputClasses} placeholder="Max Mustermann" />
+                </div>
+
+                {/* Row 2 */}
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Street Address</label>
+                  <input type="text" value={companyStreet} onChange={e => setCompanyStreet(e.target.value)} className={inputClasses} placeholder="Münchener Str. 38" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Country</label>
+                  <input type="text" value={companyCountry} onChange={e => setCompanyCountry(e.target.value)} className={inputClasses} placeholder="Deutschland" />
+                </div>
+
+                {/* Row 3 */}
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>ZIP Code</label>
+                  <input type="text" value={companyZip} onChange={e => setCompanyZip(e.target.value)} className={inputClasses} placeholder="60311" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>City</label>
+                  <input type="text" value={companyCity} onChange={e => setCompanyCity(e.target.value)} className={inputClasses} placeholder="Frankfurt am Main" />
+                </div>
+
+                {/* Row 4 */}
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Email</label>
+                  <input type="email" value={companyEmail} onChange={e => setCompanyEmail(e.target.value)} className={inputClasses} placeholder="info@99tests.de" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Phone</label>
+                  <input type="text" value={companyPhone} onChange={e => setCompanyPhone(e.target.value)} className={inputClasses} placeholder="+49 69 12345678" />
+                </div>
+
+                {/* Row 5 */}
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Website</label>
+                  <input type="text" value={companyWebsite} onChange={e => setCompanyWebsite(e.target.value)} className={inputClasses} placeholder="https://99tests.de" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Registry Info</label>
+                  <input type="text" value={companyRegistry} onChange={e => setCompanyRegistry(e.target.value)} className={inputClasses} placeholder="Amtsgericht Frankfurt HRB XXXXX" />
+                </div>
+              </div>
+            </div>
+
+            {/* Tax & Legal */}
+            <div className="pt-6 border-t border-gray-100">
+              <h2 className="font-heading font-medium text-[16px] text-near-black mb-1" style={{ textTransform: 'none' }}>Tax & Legal</h2>
+              <p className="text-[13px] text-gray-500 mb-4">Required for German invoice compliance (§14 UStG).</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Steuernummer</label>
+                  <input type="text" value={companyTaxId} onChange={e => setCompanyTaxId(e.target.value)} className={inputClasses} placeholder="045/123/45678" />
+                  <p className="text-[12px] text-gray-400">German tax number issued by the local tax office.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>USt-IdNr</label>
+                  <input type="text" value={companyUstId} onChange={e => setCompanyUstId(e.target.value)} className={inputClasses} placeholder="DE123456789" />
+                  <p className="text-[12px] text-gray-400">EU VAT identification number.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Bank Details */}
+            <div className="pt-6 border-t border-gray-100">
+              <h2 className="font-heading font-medium text-[16px] text-near-black mb-1" style={{ textTransform: 'none' }}>Bank Details</h2>
+              <p className="text-[13px] text-gray-500 mb-4">Payment information shown on invoices.</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Bank Name</label>
+                  <input type="text" value={companyBankName} onChange={e => setCompanyBankName(e.target.value)} className={inputClasses} placeholder="Deutsche Bank" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>IBAN</label>
+                  <input type="text" value={bankIban} onChange={e => setBankIban(e.target.value)} className={inputClasses} placeholder="DE89 3704 0044 0532 0130 00" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>BIC / SWIFT</label>
+                  <input type="text" value={bankBic} onChange={e => setBankBic(e.target.value)} className={inputClasses} placeholder="COBADEFFXXX" />
+                </div>
+              </div>
+            </div>
+
+            {/* Invoice Settings */}
+            <div className="pt-6 border-t border-gray-100">
+              <h2 className="font-heading font-medium text-[16px] text-near-black mb-1" style={{ textTransform: 'none' }}>Invoice Settings</h2>
+              <p className="text-[13px] text-gray-500 mb-4">Configure invoice numbering and payment terms.</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Invoice Prefix</label>
+                  <input type="text" value={invoicePrefix} onChange={e => setInvoicePrefix(e.target.value)} className={inputClasses} placeholder="INV" />
+                  <p className="text-[12px] text-gray-400">E.g., INV → INV-2026-0001</p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Payment Terms (Days)</label>
+                  <input type="number" value={invoicePaymentTerms} onChange={e => setInvoicePaymentTerms(e.target.value)} className={inputClasses} placeholder="14" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className={labelClasses}>Billing Period</label>
+                  <select value={billingPeriod} onChange={e => setBillingPeriod(e.target.value)} className={inputClasses} style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='%23999' stroke-width='1.5'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 16px center',
+                    appearance: 'none',
+                  }}>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-4 space-y-1.5">
+                <label className={labelClasses}>Invoice Footer Text</label>
+                <textarea value={invoiceFooterText} onChange={e => setInvoiceFooterText(e.target.value)} className="w-full rounded-[12px] border border-gray-200 px-4 py-2.5 text-[14px] resize-none focus:border-[#008085] focus:ring-1 focus:ring-[#008085] outline-none" rows={3} placeholder="Custom text shown at the bottom of every invoice..." />
               </div>
             </div>
           </div>

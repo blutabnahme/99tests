@@ -93,6 +93,7 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
     { icon: Bell, label: t('notifications'), href: "/admin/notifications", badge: unreadCount },
     { icon: ClipboardList, label: "Recommendations", href: "/admin/recommendations" },
     { icon: ShoppingCart, label: "Orders", href: "/admin/orders" },
+    { icon: Receipt, label: "Invoices", href: "/admin/invoices" },
     { icon: ShieldCheck, label: "Verifications", href: "/admin/verifications" },
 
     // Tests group
@@ -114,7 +115,6 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
       icon: FileOutput,
       children: [
         { icon: FileOutput, label: "PAD Export", href: "/admin/exports/pad" },
-        { icon: Receipt, label: "Doctor Invoices", href: "/admin/invoices" },
       ],
     },
 

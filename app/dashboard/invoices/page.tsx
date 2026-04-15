@@ -1,352 +1,359 @@
 "use client";
-
-import React, { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
-import {
-  Receipt, ChevronLeft, ChevronRight, Clock, CheckCircle2,
-  AlertTriangle, FileText, Download
-} from 'lucide-react';
+import { useState, useEffect, useMemo } from "react";
+import { Receipt, Clock, CheckCircle2, Download, ChevronRight, Search, FileText, AlertCircle } from "lucide-react";
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { formatDate } from '@/lib/format-date';
+
 function formatCurrency(n: number): string {
   return `€${Number(n || 0).toFixed(2)}`;
-}
-
-function getMonthLabel(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-}
-
-function getMonthYearLabel(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-}
-
-function getMonthKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function InvoiceStatusBadge({ status }: { status: string }) {
-  const config: Record<string, { bg: string; text: string; icon: any; label: string }> = {
-    draft: { bg: 'bg-gray-100', text: 'text-gray-600', icon: FileText, label: 'Draft' },
-    sent: { bg: 'bg-blue-50', text: 'text-blue-700', icon: Clock, label: 'Sent' },
-    paid: { bg: 'bg-green-50', text: 'text-green-700', icon: CheckCircle2, label: 'Paid' },
-    overdue: { bg: 'bg-red-50', text: 'text-red-600', icon: AlertTriangle, label: 'Overdue' },
-  };
-  const c = config[status] || config.draft;
-  const Icon = c.icon;
-  return (
-    <span className={`inline-flex items-center gap-1 text-[12px] font-bold uppercase px-2.5 py-1 rounded-full ${c.bg} ${c.text}`}>
-      <Icon className="w-3 h-3" />
-      {c.label}
-    </span>
-  );
 }
 
 export default function DoctorInvoicesPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  // Month navigation
-  const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date(now.getFullYear(), now.getMonth(), 1));
-  const [navOffset, setNavOffset] = useState(0); // how many months back the visible window starts
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  const [activeTab, setActiveTab] = useState<'invoices' | 'upcoming'>('invoices');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unpaid' | 'paid'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchInvoices() {
+    async function fetchData() {
       try {
         const res = await fetch('/api/doctor/invoices');
-        if (!res.ok) throw new Error('Failed to load invoices');
-        setData(await res.json());
-      } catch (err: any) { setError(err.message); }
-      finally { setLoading(false); }
+        if (res.ok) {
+          const json = await res.json();
+          setData(json);
+        }
+      } catch (err) {
+        console.error("Failed to fetch invoices:", err);
+      } finally {
+        setLoading(false);
+      }
     }
-    fetchInvoices();
+    fetchData();
   }, []);
 
-  // Generate visible months (5 months visible at a time)
-  const visibleMonths = useMemo(() => {
-    const months: Date[] = [];
-    for (let i = 4; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - navOffset - i, 1);
-      months.push(d);
-    }
-    return months;
-  }, [navOffset]);
-
-  const selectedKey = getMonthKey(selectedMonth);
-  const currentKey = getMonthKey(now);
-  const isCurrentMonth = selectedKey === currentKey;
-
-  // Find invoice for selected month
-  const monthInvoice = useMemo(() => {
-    if (!data?.invoices) return null;
-    return data.invoices.find((inv: any) => {
-      const start = new Date(inv.period_start);
-      return getMonthKey(start) === selectedKey;
+  const filteredInvoices = useMemo(() => {
+    if (!data?.invoices) return [];
+    return data.invoices.filter((inv: any) => {
+      // Status filter
+      if (statusFilter === 'unpaid' && inv.status === 'paid') return false;
+      if (statusFilter === 'paid' && inv.status !== 'paid') return false;
+      // Search
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        if (!(inv.invoice_number || '').toLowerCase().includes(q)) return false;
+      }
+      return true;
     });
-  }, [data?.invoices, selectedKey]);
+  }, [data?.invoices, statusFilter, searchQuery]);
 
-  // Filter pending orders for selected month
-  const monthOrders = useMemo(() => {
-    if (!data?.pending_orders) return [];
-    return data.pending_orders.filter((o: any) => {
-      const d = new Date(o.created_at);
-      return getMonthKey(d) === selectedKey;
-    });
-  }, [data?.pending_orders, selectedKey]);
-
-  // Calculate totals for current view
-  const viewTotals = useMemo(() => {
-    if (monthInvoice) {
-      return {
-        orders: monthInvoice.items?.length || 0,
-        tests: Number(monthInvoice.subtotal) || 0,
-        fees: Number(monthInvoice.service_fee_total) || 0,
-        vat: Number(monthInvoice.vat_total) || 0,
-        total: Number(monthInvoice.total) || 0,
-      };
+  const handleDownload = async (invoiceId: string) => {
+    try {
+      const res = await fetch(`/api/doctor/invoices/${invoiceId}/download`);
+      if (res.ok) {
+        const json = await res.json();
+        window.open(json.url, '_blank');
+      }
+    } catch (err: any) {
+      alert('Download error: ' + err.message);
     }
-    const orders = monthOrders;
-    return {
-      orders: orders.length,
-      tests: orders.reduce((s: number, o: any) => s + (Number(o.test_costs_total) || 0), 0),
-      fees: orders.reduce((s: number, o: any) => s + (Number(o.service_fee_amount) || 0), 0),
-      vat: orders.reduce((s: number, o: any) => s + (Number(o.vat_amount) || 0), 0),
-      total: orders.reduce((s: number, o: any) => s + (Number(o.total) || 0), 0),
-    };
-  }, [monthInvoice, monthOrders]);
+  };
 
-  if (loading) return <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>;
-  if (error) return <div className="p-4 bg-red-50 text-red-600 rounded-[16px] text-sm border border-red-100">{error}</div>;
+  if (loading) {
+    return <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>;
+  }
 
-  const hasContent = monthInvoice || monthOrders.length > 0;
+  const summary = data?.summary || {};
+  const pendingOrders = data?.pending_orders || [];
+  const invoices = data?.invoices || [];
 
   return (
-    <>
-      <style>{`
-        @keyframes slideFromLeft {
-          from { transform: translateX(-10px); }
-          to { transform: translateX(0); }
-        }
-        @keyframes slideFromRight {
-          from { transform: translateX(10px); }
-          to { transform: translateX(0); }
-        }
-        .animate-slide-left {
-          animation: slideFromLeft 0.15s ease-out;
-        }
-        .animate-slide-right {
-          animation: slideFromRight 0.15s ease-out;
-        }
-      `}</style>
-      <div className="space-y-6 lg:space-y-8">
+    <div className="space-y-6 font-body">
       {/* Header */}
       <div>
-        <h1 className="font-heading font-medium text-[24px] lg:text-[28px] text-near-black tracking-tight" style={{ textTransform: 'none' }}>Invoices</h1>
-        <p className="text-gray-500 text-[14px] mt-1">Monthly billing for doctor-paid recommendations.</p>
+        <h1 className="font-heading font-medium text-[24px] sm:text-[28px] text-near-black">Invoices</h1>
+        <p className="text-[13px] text-gray-500 mt-1">Your billing history and upcoming charges.</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-5 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <Clock className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <div className="text-[20px] font-heading font-medium text-near-black">{data?.summary?.pending_count || 0}</div>
-            <div className="text-[12px] text-gray-500">Current Period</div>
-          </div>
-        </div>
-        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-5 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <Receipt className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <div className="text-[20px] font-heading font-medium text-near-black">{formatCurrency(data?.summary?.pending_total || 0)}</div>
-            <div className="text-[12px] text-gray-500">Period Total</div>
-          </div>
-        </div>
-        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-5 flex items-center gap-3">
+      {/* Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-5 flex items-center gap-4">
           <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5 text-amber-600" />
+            <AlertCircle className="w-5 h-5 text-amber-500" />
           </div>
           <div>
-            <div className="text-[20px] font-heading font-medium text-near-black">{formatCurrency(data?.summary?.total_outstanding || 0)}</div>
-            <div className="text-[12px] text-gray-500">Outstanding</div>
+            <div className="text-[22px] font-heading font-medium text-near-black">{formatCurrency(summary.total_outstanding || 0)}</div>
+            <div className="text-[13px] text-gray-500">Outstanding</div>
           </div>
         </div>
-        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-5 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5 text-green-600" />
+        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-5 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+            <Clock className="w-5 h-5 text-blue-500" />
           </div>
           <div>
-            <div className="text-[20px] font-heading font-medium text-near-black">{formatCurrency(data?.summary?.total_paid || 0)}</div>
-            <div className="text-[12px] text-gray-500">Total Paid</div>
+            <div className="text-[22px] font-heading font-medium text-near-black">{formatCurrency(summary.pending_total || 0)}</div>
+            <div className="text-[13px] text-gray-500">Upcoming ({summary.pending_count || 0} orders)</div>
+          </div>
+        </div>
+        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-5 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+          </div>
+          <div>
+            <div className="text-[22px] font-heading font-medium text-near-black">{formatCurrency(summary.total_paid || 0)}</div>
+            <div className="text-[13px] text-gray-500">Paid</div>
           </div>
         </div>
       </div>
 
-      {/* Main card */}
-      <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm overflow-hidden">
-        {/* Month navigator */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <h2 className="font-heading font-medium text-[18px] text-near-black" style={{ textTransform: 'none' }}>{getMonthYearLabel(selectedMonth)}</h2>
-            <p className="text-[12px] text-gray-500 mt-0.5">
-              {isCurrentMonth ? 'Current billing period' : monthInvoice ? `Invoice ${monthInvoice.invoice_number}` : 'No invoice'}
-            </p>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => { setSlideDirection('right'); setNavOffset(prev => prev + 1); }}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all duration-150 active:scale-90"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <div className="overflow-hidden rounded-full bg-gray-100">
-              <div key={`nav-${navOffset}`} className={`flex items-center gap-1 p-1 ${slideDirection === 'left' ? 'animate-slide-left' : slideDirection === 'right' ? 'animate-slide-right' : ''}`}>
-                {visibleMonths.map(m => {
-                  const key = getMonthKey(m);
-                  const isSelected = key === selectedKey;
-                  const isCurrent = key === currentKey;
-                  // Check if month has an invoice
-                  const hasInvoice = data?.invoices?.some((inv: any) => getMonthKey(new Date(inv.period_start)) === key);
-                  const hasOrders = data?.pending_orders?.some((o: any) => getMonthKey(new Date(o.created_at)) === key);
-                  const hasDot = hasInvoice || hasOrders;
-
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setSelectedMonth(m)}
-                      className={`relative px-3 py-1.5 rounded-full text-[12px] font-medium transition-all duration-200 ${
-                        isSelected
-                          ? 'bg-white text-near-black shadow-sm'
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      {getMonthLabel(m)}
-                      {hasDot && !isSelected && (
-                        <span className={`absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${hasInvoice ? 'bg-primary' : 'bg-gray-300'}`} />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <button
-              onClick={() => { setSlideDirection('left'); setNavOffset(prev => Math.max(0, prev - 1)); }}
-              disabled={navOffset === 0}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all duration-150 active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Invoice status bar (for past months with invoice) */}
-        {monthInvoice && (
-          <div className="px-6 py-3 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <InvoiceStatusBadge status={monthInvoice.status} />
-              <span className="text-[12px] text-gray-500">
-                {getMonthYearLabel(new Date(monthInvoice.period_start))}
+      {/* Tab Bar */}
+      <div className="flex border-b border-gray-200">
+        {[
+          { key: 'invoices', label: 'Invoices', count: invoices.length },
+          { key: 'upcoming', label: 'Upcoming', count: pendingOrders.length },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key as any)}
+            className={`px-4 py-2.5 text-[14px] font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+              activeTab === tab.key
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-near-black'
+            }`}
+          >
+            {tab.label}
+            {tab.count > 0 && (
+              <span className={`min-w-[18px] h-[18px] flex items-center justify-center text-[9px] font-bold rounded-full px-1 ${
+                activeTab === tab.key ? 'bg-primary/10 text-primary' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {tab.count}
               </span>
-              {monthInvoice.paid_at && (
-                <span className="text-[12px] text-green-600">Paid {formatDate(monthInvoice.paid_at)}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {/* INVOICES TAB */}
+      {activeTab === 'invoices' && (
+        <div className="space-y-4 mt-4">
+          {/* Filter bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex-1 relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by invoice number..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-full border border-gray-200 text-[13px] focus:border-[#008085] focus:ring-1 focus:ring-[#008085] outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              {['all', 'unpaid', 'paid'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s as any)}
+                  className={`px-3.5 py-2 rounded-full text-[12px] font-medium transition-colors ${
+                    statusFilter === s
+                      ? 'bg-[#008085] text-white'
+                      : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+                  }`}
+                >
+                  {s === 'all' ? 'All' : s === 'unpaid' ? 'Unpaid' : 'Paid'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Invoice list */}
+          {filteredInvoices.length === 0 ? (
+            <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm py-10 text-center">
+              <Receipt className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+              <p className="text-[14px] text-gray-400">
+                {invoices.length === 0 ? 'No invoices yet' : 'No invoices match your filters'}
+              </p>
+              {invoices.length === 0 && (
+                <p className="text-[12px] text-gray-300 mt-1">Invoices will appear here once generated by the admin.</p>
               )}
             </div>
-            <button className="flex items-center gap-1.5 text-[12px] text-primary font-medium hover:underline">
-              <Download className="w-3.5 h-3.5" />
-              PDF
-            </button>
-          </div>
-        )}
+          ) : (
+            <div className="space-y-3">
+              {filteredInvoices.map((inv: any) => {
+                const isExpanded = expandedInvoice === inv.id;
+                const lineItems = inv.line_items || inv.items || [];
+                const periodLabel = inv.period_start
+                  ? new Date(inv.period_start).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                  : '';
 
-        {/* Content */}
-        {!hasContent ? (
-          <div className="py-16 text-center">
-            <Receipt className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-            <p className="text-gray-400 text-[14px]">No orders in this period</p>
-          </div>
-        ) : (
-          <div>
-            {/* Orders table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px] whitespace-nowrap">
-                <thead className="bg-gray-50/30 text-gray-500 font-medium text-[11px] uppercase tracking-wider">
-                  <tr>
-                    <th className="px-6 py-2.5">Order</th>
-                    <th className="px-6 py-2.5">Patient</th>
-                    <th className="px-6 py-2.5 text-right">Tests</th>
-                    <th className="px-6 py-2.5 text-right">Fee</th>
-                    <th className="px-6 py-2.5 text-right">Total</th>
-                    <th className="px-6 py-2.5 text-right">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {monthInvoice ? (
-                    /* Past invoice — show line items */
-                    (monthInvoice.items || []).map((item: any) => (
-                      <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-3">
-                          <Link href={`/dashboard/recommendations/${item.recommendation_id || item.id}`} className="font-mono text-primary font-semibold hover:underline">
-                            {item.display_id}
-                          </Link>
-                        </td>
-                        <td className="px-6 py-3 text-gray-700">{item.patient_name}</td>
-                        <td className="px-6 py-3 text-right font-mono text-gray-500">{formatCurrency(item.test_total)}</td>
-                        <td className="px-6 py-3 text-right font-mono text-gray-500">{formatCurrency(item.service_fee)}</td>
-                        <td className="px-6 py-3 text-right font-mono font-medium text-gray-800">{formatCurrency(item.line_total)}</td>
-                        <td className="px-6 py-3 text-right text-gray-500 text-[12px]">{formatDate(item.created_at)}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    /* Current period — show pending orders */
-                    monthOrders.map((order: any) => (
-                      <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-3">
-                          <Link href={`/dashboard/recommendations/${order.recommendation_id || order.id}`} className="font-mono text-primary font-semibold hover:underline">
-                            {order.display_id || '-'}
-                          </Link>
-                        </td>
-                        <td className="px-6 py-3 text-gray-700">{order.patient?.first_name} {order.patient?.last_name}</td>
-                        <td className="px-6 py-3 text-right font-mono text-gray-500">{formatCurrency(Number(order.test_costs_total) || 0)}</td>
-                        <td className="px-6 py-3 text-right font-mono text-gray-500">{formatCurrency(Number(order.service_fee_amount) || 0)}</td>
-                        <td className="px-6 py-3 text-right font-mono font-medium text-gray-800">{formatCurrency(Number(order.total) || 0)}</td>
-                        <td className="px-6 py-3 text-right text-gray-500 text-[12px]">{formatDate(order.created_at)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                return (
+                  <div key={inv.id} className="bg-white rounded-[16px] border border-gray-200 shadow-sm overflow-hidden">
+                    {/* Collapsed row */}
+                    <button
+                      onClick={() => setExpandedInvoice(isExpanded ? null : inv.id)}
+                      className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                        <div className="text-left">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[14px] text-[#008085] font-semibold">{inv.invoice_number}</span>
+                            <span className={`text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                              inv.status === 'paid' ? 'bg-emerald-50 text-emerald-700' :
+                              inv.status === 'overdue' ? 'bg-red-50 text-red-700' :
+                              'bg-amber-50 text-amber-700'
+                            }`}>
+                              {inv.status === 'paid' ? 'Paid' :
+                               inv.status === 'overdue' ? 'Overdue' :
+                               'Unpaid'}
+                            </span>
+                          </div>
+                          <div className="text-[12px] text-gray-400 mt-0.5">{periodLabel}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[16px] font-mono font-medium text-near-black">{formatCurrency(inv.total || inv.gross_total || 0)}</div>
+                        {inv.due_date && inv.status !== 'paid' && (
+                          <div className="text-[11px] text-gray-400">Due {formatDate(inv.due_date)}</div>
+                        )}
+                        {inv.paid_at && inv.status === 'paid' && (
+                          <div className="text-[11px] text-emerald-500">Paid {formatDate(inv.paid_at)}</div>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Expanded detail */}
+                    {isExpanded && (
+                      <div className="px-5 pb-5 border-t border-gray-100">
+                        {/* Summary metrics */}
+                        <div className="grid grid-cols-4 gap-4 py-4">
+                          <div>
+                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Tests</div>
+                            <div className="text-[14px] font-mono font-medium text-near-black mt-0.5">{formatCurrency(inv.subtotal || 0)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Service Fee</div>
+                            <div className="text-[14px] font-mono font-medium text-near-black mt-0.5">{formatCurrency(inv.service_fee_total || 0)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">VAT</div>
+                            <div className="text-[14px] font-mono font-medium text-near-black mt-0.5">{formatCurrency(inv.vat_total || 0)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] text-gray-400 uppercase tracking-wider">Total</div>
+                            <div className="text-[14px] font-mono font-medium text-primary mt-0.5">{formatCurrency(inv.total || inv.gross_total || 0)}</div>
+                          </div>
+                        </div>
+
+                        {/* Line items */}
+                        {lineItems.length > 0 && (
+                          <div className="border border-gray-100 rounded-[12px] overflow-hidden max-h-[300px] overflow-y-auto">
+                            <table className="w-full text-[13px]">
+                              <thead>
+                                <tr className="bg-gray-50/50">
+                                  <th className="text-left px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Order</th>
+                                  <th className="text-left px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Patient</th>
+                                  <th className="text-right px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Tests</th>
+                                  <th className="text-right px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Fee</th>
+                                  <th className="text-right px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-50">
+                                {lineItems.map((item: any, idx: number) => (
+                                  <tr key={idx} className="hover:bg-gray-50/30">
+                                    <td className="px-4 py-2.5 font-mono text-[#008085] font-semibold">{item.display_id}</td>
+                                    <td className="px-4 py-2.5 text-gray-600">{item.patient_name}</td>
+                                    <td className="px-4 py-2.5 text-right font-mono text-gray-600">{formatCurrency(item.test_total || 0)}</td>
+                                    <td className="px-4 py-2.5 text-right font-mono text-gray-600">{formatCurrency(item.service_fee || 0)}</td>
+                                    <td className="px-4 py-2.5 text-right font-mono font-medium text-near-black">{formatCurrency(item.line_total || 0)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+
+                        {/* Download */}
+                        <div className="mt-4">
+                          <button
+                            onClick={() => handleDownload(inv.id)}
+                            className="px-4 py-2 rounded-full border border-[#008085] text-[#008085] hover:bg-[#008085]/5 text-[13px] font-medium transition-colors flex items-center gap-2"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Download PDF
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-
-            {/* Footer summary */}
-            <div className="px-6 py-3.5 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-4 text-[13px] text-gray-500">
-                <span>{viewTotals.orders} order{viewTotals.orders !== 1 ? 's' : ''}</span>
-                <span className="text-gray-300">·</span>
-                <span>Tests {formatCurrency(viewTotals.tests)}</span>
-                <span className="text-gray-300">·</span>
-                <span>Fees {formatCurrency(viewTotals.fees)}</span>
-                <span className="text-gray-300">·</span>
-                <span>VAT {formatCurrency(viewTotals.vat)}</span>
-              </div>
-              <span className="font-mono font-semibold text-primary text-[20px]">{formatCurrency(viewTotals.total)}</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Hint for current month */}
-      {isCurrentMonth && monthOrders.length > 0 && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-[12px]">
-          <Clock className="w-4 h-4 text-gray-400 shrink-0" />
-          <span className="text-[12px] text-gray-400">Invoice will be generated at the end of the billing period.</span>
+          )}
         </div>
       )}
+
+      {/* UPCOMING TAB */}
+      {activeTab === 'upcoming' && (
+        <div className="space-y-4 mt-4">
+          {pendingOrders.length === 0 ? (
+            <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm py-10 text-center">
+              <CheckCircle2 className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+              <p className="text-[14px] text-gray-400">No pending charges</p>
+              <p className="text-[12px] text-gray-300 mt-1">All your orders have been invoiced.</p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-blue-50/50 rounded-[12px] p-4">
+                <p className="text-[13px] text-blue-700">
+                  These orders will be included in your next invoice. The invoice will be generated at the end of the billing period.
+                </p>
+              </div>
+
+              <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm overflow-hidden">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="bg-gray-50/50">
+                      <th className="text-left px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Order</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Patient</th>
+                      <th className="text-right px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Tests</th>
+                      <th className="text-right px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Fee</th>
+                      <th className="text-right px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Shipping</th>
+                      <th className="text-right px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Total</th>
+                      <th className="text-right px-4 py-2.5 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {pendingOrders.map((order: any) => (
+                      <tr key={order.id} className="hover:bg-gray-50/30">
+                        <td className="px-4 py-3 font-mono text-[#008085] font-semibold">{order.display_id}</td>
+                        <td className="px-4 py-3 text-gray-600">{order.patient?.first_name} {order.patient?.last_name}</td>
+                        <td className="px-4 py-3 text-right font-mono text-gray-600">{formatCurrency(order.test_costs_total || 0)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-gray-600">{formatCurrency(order.service_fee_amount || 0)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-gray-600">{formatCurrency(order.shipping_cost || 0)}</td>
+                        <td className="px-4 py-3 text-right font-mono font-medium text-near-black">{formatCurrency(order.total || 0)}</td>
+                        <td className="px-4 py-3 text-right text-gray-400">{formatDate(order.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Upcoming total */}
+              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 rounded-[12px]">
+                <span className="text-[13px] text-gray-500">
+                  {pendingOrders.length} order{pendingOrders.length !== 1 ? 's' : ''} pending
+                </span>
+                <span className="text-[16px] font-heading font-medium text-primary">
+                  {formatCurrency(summary.pending_total || 0)}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
     </div>
-    </>
   );
 }

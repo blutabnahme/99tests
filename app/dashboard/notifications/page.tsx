@@ -78,10 +78,12 @@ export default function NotificationsPage() {
 
   const handleNotificationClick = (notification: any) => {
     if (!notification.is_read) markAsRead(notification.id);
-    if (notification.reference_id) {
-      if (notification.reference_type === 'recommendation' || notification.reference_type === 'order') {
-        router.push(`/dashboard/recommendations/${notification.reference_id}`);
-      }
+    if (notification.link) {
+      router.push(notification.link);
+    } else if (notification.reference_type === 'invoice') {
+      router.push('/dashboard/invoices');
+    } else if (notification.reference_id) {
+      router.push(`/dashboard/recommendations/${notification.reference_id}`);
     }
   };
 
