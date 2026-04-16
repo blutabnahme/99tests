@@ -16,13 +16,13 @@ interface CreateNotificationParams {
 
 export async function createNotification({ userId, type, title, message, link }: CreateNotificationParams) {
   try {
-    await supabaseAdmin.from('notifications').insert({
+    await supabaseAdmin.from('tt_notification').insert({
       user_id: userId,
       type,
       title,
       message,
       link: link || null,
-      read: false
+      is_read: false
     });
   } catch (err) {
     console.error('[NOTIFICATION ERROR]', err);
@@ -88,12 +88,12 @@ export async function checkAndCreateSLANotifications() {
         for (const admin of adminUsers) {
           // 4. Discard duplicated events already broadcasting 
           const { data: existing } = await supabaseAdmin
-            .from('notifications')
+            .from('tt_notification')
             .select('id')
             .eq('user_id', admin.id)
             .eq('type', 'system_alert')
             .ilike('message', `Unmatched SLA breach: Recommendation ${c.id}%`)
-            .eq('read', false)
+            .eq('is_read', false)
             .limit(1);
 
           if (!existing || existing.length === 0) {
@@ -135,7 +135,7 @@ export async function notifyPatient(recommendationId: string, triggerType: strin
 
     // 3. Deduplicate (ensure we don't send the identical notification type for the same patient/recommendation twice)
     const { data: existingNotif } = await supabaseAdmin
-      .from('notifications')
+      .from('tt_notification')
       .select('id')
       .eq('user_id', patient.id)
       .eq('type', triggerType)
@@ -220,7 +220,7 @@ export async function sendTemplatedNotification({ slug, recipientId, recommendat
   try {
     // 1. Deduplication Check
     const { data: existing } = await supabaseAdmin
-      .from('notifications')
+      .from('tt_notification')
       .select('id')
       .eq('user_id', recipientId)
       .eq('type', slug)
@@ -253,13 +253,13 @@ export async function sendTemplatedNotification({ slug, recipientId, recommendat
 
     // 3. Dispatch Notification
     if (template?.send_in_app !== false) {
-      await supabaseAdmin.from('notifications').insert({
+      await supabaseAdmin.from('tt_notification').insert({
         user_id: recipientId,
         type: slug,
         title,
         message,
         link: link || null,
-        read: false,
+        is_read: false,
         recommendation_id: recommendationId
       });
     }
@@ -298,3 +298,4 @@ export async function sendTemplatedNotification({ slug, recipientId, recommendat
      console.error(`[TEMPLATED NOTIFICATION ERROR] (slug: ${slug})`, err);
   }
 }
+

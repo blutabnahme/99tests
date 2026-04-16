@@ -92,7 +92,7 @@ export async function POST(
         uploaded_by: 'admin',
         admin_notes: admin_notes || null,
       })
-      .select()
+      .select('*, laboratory:laboratory_id(name, address_city)')
       .single();
 
     if (insertError) {

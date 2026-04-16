@@ -62,7 +62,7 @@ export default function NotificationsView({
  });
  if (res.ok) {
  setNotifications(prev => prev.map(n => 
- ids.includes(n.id) ? { ...n, read: true } : n
+ ids.includes(n.id) ? { ...n, is_read: true } : n
  ));
  setUnreadCount(prev => Math.max(0, prev - ids.length));
  }
@@ -83,7 +83,7 @@ export default function NotificationsView({
  body: JSON.stringify({ action: 'mark_all_read' })
  });
  if (res.ok) {
- setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+ setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
  setUnreadCount(0);
  }
  } catch (error) {
@@ -97,11 +97,11 @@ export default function NotificationsView({
  if (!user) return;
  
  if (selectedIds.length > 0) {
- await supabase.from('notifications').delete().eq('user_id', user.id).in('id', selectedIds);
+ await supabase.from('tt_notification').delete().eq('user_id', user.id).in('id', selectedIds);
  setNotifications(prev => prev.filter(n => !selectedIds.includes(n.id)));
  setSelectedIds([]);
  } else {
- await supabase.from('notifications').delete().eq('user_id', user.id).eq('read', true);
+ await supabase.from('tt_notification').delete().eq('user_id', user.id).eq('is_read', true);
  setNotifications(prev => prev.filter(n => !n.read));
  }
  };
@@ -282,7 +282,7 @@ export default function NotificationsView({
  const query = searchQuery.toLowerCase();
  return n.title?.toLowerCase().includes(query) || n.message?.toLowerCase().includes(query);
  }).map((notification) => {
- const isUnread = !notification.read;
+ const isUnread = !notification.is_read;
  const source = getSource(notification.type, notification.link);
 
  return (
@@ -403,3 +403,4 @@ export default function NotificationsView({
  </div>
  );
 }
+

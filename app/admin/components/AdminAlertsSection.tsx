@@ -13,7 +13,7 @@ interface Notification {
  title: string;
  message: string;
  link: string;
- read: boolean;
+ is_read: boolean;
  created_at: string;
 }
 
@@ -48,10 +48,10 @@ export default function AdminAlertsSection() {
  .on('postgres_changes', { 
  event: 'INSERT', 
  schema: 'public', 
- table: 'notifications' 
+ table: 'tt_notification' 
  }, (payload) => {
  const newNotif = payload.new as Notification;
- if (!newNotif.read && newNotif.type === 'system_alert') {
+ if (!newNotif.is_read && newNotif.type === 'system_alert') {
  setAlerts(prev => [newNotif, ...prev]);
  }
  })
@@ -68,11 +68,11 @@ export default function AdminAlertsSection() {
  if (!user) return;
 
  const { data } = await supabase
- .from('notifications')
+ .from('tt_notification')
  .select('*')
  .eq('user_id', user.id)
  .eq('type', 'system_alert')
- .eq('read', false)
+ .eq('is_read', false)
  .order('created_at', { ascending: false })
  .limit(3);
 
@@ -81,7 +81,7 @@ export default function AdminAlertsSection() {
  };
 
  const markAsResolved = async (id: string) => {
- await supabase.from('notifications').update({ read: true }).eq('id', id);
+ await supabase.from('tt_notification').update({ is_read: true }).eq('id', id);
  setAlerts(prev => prev.filter(a => a.id !== id));
  };
 
@@ -186,3 +186,4 @@ export default function AdminAlertsSection() {
  </div>
  );
 }
+

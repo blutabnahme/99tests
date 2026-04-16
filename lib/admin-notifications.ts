@@ -47,11 +47,11 @@ export async function notifyAdmins(
       title: title,
       message: message,
       link: link,
-      read: false
+      is_read: false
     }));
 
     const { error: insertErr } = await supabaseAdmin
-      .from('notifications')
+      .from('tt_notification')
       .insert(notificationsToInsert);
 
     if (insertErr) {
@@ -66,3 +66,4 @@ export async function notifyAdmins(
     return false;
   }
 }
+

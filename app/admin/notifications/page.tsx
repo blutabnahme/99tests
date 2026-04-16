@@ -1,455 +1,343 @@
 "use client";
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  Bell, CheckCheck, CreditCard, Truck, FlaskConical, Clock,
+  Search, ArrowRight, UserPlus, Receipt, Stethoscope,
+  AlertCircle, Package, ClipboardList
+} from 'lucide-react';
+import { createClient } from '@/lib/supabase';
+import { formatDate } from '@/lib/format-date';
 
-import { useState, useEffect, useMemo } from "react";
-import { createClient } from "@/lib/supabase";
-import { 
- Bell, Check, Clock, FileText, CheckCircle, XCircle, 
- Activity, Star, Calendar, CreditCard, AlertTriangle, 
- Users, Search, ArrowRight, UserCircle, ChevronLeft, ChevronRight, CheckCircle2, Trash2, ChevronDown
-} from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { formatDistanceToNow } from "date-fns";
-import { useNotifications } from "@/hooks/useNotifications";
-import { useTranslations } from "next-intl";
-
-type Notification = {
- id: string;
- type: string;
- title: string;
- message: string;
- link: string | null;
- read: boolean;
- created_at: string;
+const NOTIFICATION_ICONS: Record<string, any> = {
+  payment_received: { icon: CreditCard, bg: 'bg-green-50', color: 'text-green-600' },
+  bank_transfer_confirmed: { icon: CreditCard, bg: 'bg-green-50', color: 'text-green-600' },
+  bank_transfer_pending: { icon: Clock, bg: 'bg-amber-50', color: 'text-amber-600' },
+  kit_shipped: { icon: Truck, bg: 'bg-blue-50', color: 'text-blue-600' },
+  results_ready: { icon: FlaskConical, bg: 'bg-[#E6F7F5]', color: 'text-[#008085]' },
+  results_received: { icon: FlaskConical, bg: 'bg-[#E6F7F5]', color: 'text-[#008085]' },
+  payment_confirmed: { icon: CreditCard, bg: 'bg-green-50', color: 'text-green-600' },
+  new_doctor_registered: { icon: UserPlus, bg: 'bg-purple-50', color: 'text-purple-600' },
+  doctor_verification_required: { icon: Stethoscope, bg: 'bg-amber-50', color: 'text-amber-600' },
+  invoice_generated: { icon: Receipt, bg: 'bg-[#E6F7F5]', color: 'text-[#008085]' },
+  invoice_sent: { icon: Receipt, bg: 'bg-blue-50', color: 'text-blue-600' },
+  resend_requested: { icon: AlertCircle, bg: 'bg-red-50', color: 'text-red-600' },
+  new_recommendation: { icon: ClipboardList, bg: 'bg-purple-50', color: 'text-purple-600' },
+  new_order: { icon: Package, bg: 'bg-blue-50', color: 'text-blue-600' },
 };
 
-const TABS = ['All', 'Unread', 'Critical', 'Recommendations', 'Users', 'System'];
+function getNotificationIcon(type: string) {
+  return NOTIFICATION_ICONS[type] || { icon: Bell, bg: 'bg-gray-100', color: 'text-gray-500' };
+}
+
+function timeAgo(dateStr: string) {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return formatDate(dateStr);
+}
 
 export default function AdminNotificationsPage() {
- const t = useTranslations();
- const supabase = createClient();
- const router = useRouter();
- 
- // Use the hook to sync global unread count badge on sidebar, but manage local large list here
- const { markAsRead: globalMarkAsRead, markAllAsRead: globalMarkAllAsRead } = useNotifications();
- 
- const [notifications, setNotifications] = useState<Notification[]>([]);
- const [loading, setLoading] = useState(true);
- const [activeTab, setActiveTab] = useState("All");
- const [searchQuery, setSearchQuery] = useState("");
- const [currentPage, setCurrentPage] = useState(1);
- const [selectedIds, setSelectedIds] = useState<string[]>([]);
- const itemsPerPage = 10;
+  const router = useRouter();
+  const supabase = createClient();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [markingAll, setMarkingAll] = useState(false);
 
- useEffect(() => {
- fetchNotifications();
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
 
- const fetchUser = async () => {
- const { data: { user } } = await supabase.auth.getUser();
- if (!user) return;
- 
- const channel = supabase.channel('page_notifications_changes')
- .on('postgres_changes', { 
- event: '*', 
- schema: 'public', 
- table: 'notifications',
- filter: `user_id=eq.${user.id}`
- }, () => {
- fetchNotifications();
- })
- .subscribe();
- 
- return () => {
- supabase.removeChannel(channel);
- };
- };
- 
- fetchUser();
- }, []);
+  async function fetchNotifications() {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
- const fetchNotifications = async () => {
- const { data: { user } } = await supabase.auth.getUser();
- if (!user) return;
+      const { data, error } = await supabase
+        .from('tt_notification')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
 
- const { data, error } = await supabase
- .from('notifications')
- .select('*')
- .eq('user_id', user.id)
- .order('created_at', { ascending: false })
- .limit(500); // Fetch a large chunk for local filtering/pagination
+      if (error) throw error;
+      setNotifications(data || []);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
- if (!error && data) {
- setNotifications(data);
- }
- setLoading(false);
- };
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter(n => {
+      if (filter === 'unread' && n.is_read) return false;
+      if (typeFilter !== 'all') {
+        const notifType = n.notification_type || n.type;
+        if (typeFilter === 'invoices' && !(notifType?.includes('invoice'))) return false;
+        if (typeFilter === 'payments' && !(notifType?.includes('payment') || notifType?.includes('bank_transfer'))) return false;
+        if (typeFilter === 'orders' && !(notifType?.includes('order') || notifType?.includes('kit') || notifType?.includes('results'))) return false;
+        if (typeFilter === 'users' && !(notifType?.includes('doctor') || notifType?.includes('patient') || notifType?.includes('user'))) return false;
+      }
+      if (search) {
+        const q = search.toLowerCase();
+        if (!(n.title || '').toLowerCase().includes(q) && !(n.message || '').toLowerCase().includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [notifications, filter, typeFilter, search]);
 
- const getSeverity = (type: string) => {
- if (type === 'system_alert') return 'critical';
- if (type === 'appointment_reminder') return 'warning';
- return 'info';
- };
+  const unreadCount = useMemo(() => notifications.filter(n => !n.is_read).length, [notifications]);
 
- const getIcon = (type: string) => {
- switch (type) {
- case "new_opportunity": return <Star className="w-5 h-5 text-amber-500" />;
- case "application_received": return <FileText className="w-5 h-5 text-blue-500" />;
- case "application_accepted": return <CheckCircle className="w-5 h-5 text-emerald-500" />;
- case "application_rejected": return <XCircle className="w-5 h-5 text-rose-500" />;
- case "case_update": return <Activity className="w-5 h-5 text-indigo-500" />;
- case "shortlist_ready": return <Users className="w-5 h-5 text-purple-500" />;
- case "appointment_reminder": return <Calendar className="w-5 h-5 text-orange-500" />;
- case "payment_received": return <CreditCard className="w-5 h-5 text-emerald-600" />;
- case "system_alert": return <AlertTriangle className="w-5 h-5 text-rose-600" />;
- default: return <Bell className="w-5 h-5 text-gray-500" />;
- }
- };
+  const toggleSelected = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
 
- const getSource = (type: string, link: string | null) => {
- if (link?.includes('/recommendations/')) return `Recommendation ${link.split('/').pop()}`;
- if (link?.includes('/users/')) return `User ${link.split('/').pop()}`;
- if (type.includes('application')) return 'Network Application';
- if (type === 'system_alert') return 'System Event';
- return 'Platform';
- };
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredNotifications.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredNotifications.map(n => n.id)));
+    }
+  };
 
- const handleMarkAsRead = async (ids: string[]) => {
- // Manually push to exact same API that handles array bulk marks natively
- await fetch('/api/notifications', {
- method: 'PATCH',
- headers: { 'Content-Type': 'application/json' },
- body: JSON.stringify({ action: 'mark_read', ids })
- });
- // Trigger global navbar update (which requires iterative pulls)
- for (const id of ids) {
- await globalMarkAsRead(id);
- }
- setNotifications(prev => prev.map(n => ids.includes(n.id) ? { ...n, read: true } : n));
- };
+  const markAsRead = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    await supabase.from('tt_notification').update({ is_read: true }).in('id', ids);
+    setNotifications(prev => prev.map(n => ids.includes(n.id) ? { ...n, is_read: true } : n));
+  };
 
- const handleMarkAllAsRead = async () => {
- if (selectedIds.length > 0) {
- await handleMarkAsRead(selectedIds);
- setSelectedIds([]);
- } else {
- await globalMarkAllAsRead();
- setNotifications(prev => prev.map(n => ({ ...n, read: true })));
- }
- };
+  const markAllAsRead = async () => {
+    setMarkingAll(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setMarkingAll(false); return; }
+    await supabase.from('tt_notification').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    setMarkingAll(false);
+  };
 
- const handleClearResolved = async () => {
- const { data: { user } } = await supabase.auth.getUser();
- if (!user) return;
- 
- if (selectedIds.length > 0) {
- await supabase.from('notifications').delete().eq('user_id', user.id).in('id', selectedIds);
- setNotifications(prev => prev.filter(n => !selectedIds.includes(n.id)));
- setSelectedIds([]);
- } else {
- await supabase.from('notifications').delete().eq('user_id', user.id).eq('read', true);
- setNotifications(prev => prev.filter(n => !n.read));
- }
- };
+  const markSelectedAsRead = async () => {
+    await markAsRead(Array.from(selectedIds));
+    setSelectedIds(new Set());
+  };
 
- const filteredNotifications = useMemo(() => {
- return notifications
- .filter(n => {
- // Tab filter
- if (activeTab === 'Unread') return !n.read;
- if (activeTab === 'Critical') return n.type === 'system_alert';
- if (activeTab === 'Recommendations') return n.type === 'case_update' || n.type === 'new_opportunity' || n.type === 'appointment_reminder';
- if (activeTab === 'Users') return n.type.includes('application') || n.type === 'shortlist_ready';
- if (activeTab === 'System') return n.type === 'system_alert' || n.type === 'payment_received';
- return true;
- })
- .filter(n => {
- // Text filter
- if (!searchQuery.trim()) return true;
- const query = searchQuery.toLowerCase();
- return n.title.toLowerCase().includes(query) || n.message.toLowerCase().includes(query);
- });
- }, [notifications, activeTab, searchQuery]);
+  const handleView = async (notification: any) => {
+    if (!notification.is_read) {
+      await markAsRead([notification.id]);
+    }
+    if (notification.link) {
+      router.push(notification.link);
+    } else if (notification.reference_type === 'invoice') {
+      router.push('/admin/invoices');
+    } else if (notification.reference_type === 'recommendation' && notification.reference_id) {
+      router.push(`/admin/recommendations/${notification.reference_id}`);
+    } else if (notification.reference_type === 'order' && notification.reference_id) {
+      router.push(`/admin/orders/${notification.reference_id}`);
+    }
+  };
 
- const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
- const currentItems = filteredNotifications.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  if (loading) {
+    return <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>;
+  }
 
- // Reset to page 1 when filters change
- useEffect(() => {
- setCurrentPage(1);
- }, [activeTab, searchQuery]);
+  return (
+    <div className="space-y-6 font-body">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-heading font-medium text-[24px] sm:text-[28px] text-near-black">Notifications</h1>
+          <p className="text-[13px] text-gray-500 mt-1">Platform alerts and activities.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 ? (
+            <>
+              <button
+                onClick={markSelectedAsRead}
+                className="px-4 py-2 rounded-full bg-[#008085] text-white hover:bg-[#005C5F] text-[13px] font-medium transition-colors flex items-center gap-1.5"
+              >
+                <CheckCheck className="w-4 h-4" />
+                Mark {selectedIds.size} Read
+              </button>
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllAsRead}
+                  disabled={markingAll}
+                  className="px-4 py-2 rounded-full border border-gray-200 text-gray-600 hover:border-gray-300 text-[13px] font-medium transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  Mark All Read
+                </button>
+              )}
+            </>
+          ) : (
+            unreadCount > 0 && (
+              <button
+                onClick={markAllAsRead}
+                disabled={markingAll}
+                className="px-4 py-2 rounded-full bg-[#008085] text-white hover:bg-[#005C5F] text-[13px] font-medium transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <CheckCheck className="w-4 h-4" />
+                Mark All Read
+              </button>
+            )
+          )}
+        </div>
+      </div>
 
- return (
- <div className="flex-1 min-w-0">
- <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
- <div>
- <h1 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight mb-1">
- {t('nav.notifications')}
- </h1>
- <p className="text-[13px] sm:text-[15px] text-gray-500">Manage your platform alerts and activities.</p>
- </div>
- <div className="flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
- {selectedIds.length > 0 && (
- <span className="hidden sm:inline text-[13px] text-gray-500 sm:mr-2">{selectedIds.length} selected</span>
- )}
- <button 
- onClick={handleMarkAllAsRead}
- className="flex-1 sm:flex-none h-9 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-near-black text-[12px] sm:text-[13px] font-semibold rounded-lg sm:rounded-full hover:bg-gray-50 transition-colors shadow-sm"
- >
- <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
- {selectedIds.length > 0 ? "Mark Selected" : "Mark All Read"}
- </button>
- <button 
- onClick={handleClearResolved}
- className="flex-1 sm:flex-none h-9 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-near-black text-[12px] sm:text-[13px] font-semibold rounded-lg sm:rounded-full hover:bg-red-50 hover:text-red-600 transition-colors shadow-sm"
- >
- <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-500 shrink-0" />
- {selectedIds.length > 0 ? "Clear Selected" : "Clear Resolved"}
- </button>
- </div>
- </div>
+      {/* Filter Bar */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
+        {/* Search */}
+        <div className="flex-1 relative">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search notifications..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-full border border-gray-200 text-[13px] focus:border-[#008085] focus:ring-1 focus:ring-[#008085] outline-none"
+          />
+        </div>
 
- <div className="bg-white rounded-lg border border-gray-200 flex flex-col min-h-[400px] mt-4 overflow-hidden">
- 
- {/* Desktop Toolbar */}
- <div className="hidden sm:flex lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-6 border-b border-gray-200">
- <div className="flex gap-2 overflow-x-auto pb-1 lg:pb-0" style={{ scrollbarWidth: 'none' }}>
- {TABS.map(tab => (
- <button
- key={tab}
- onClick={() => setActiveTab(tab)}
- className={`px-4 py-2 rounded-lg text-[13px] shrink-0 font-semibold transition-colors whitespace-nowrap ${
- activeTab === tab 
- ? "bg-gray-100 text-near-black" 
- : "text-gray-500 hover:bg-gray-50 hover:text-near-black"
- }`}
- >
- {tab}
- {tab === 'Unread' && (
- <span className="ml-2 px-1.5 py-0.5 rounded-full bg-primary-light text-primary-dark text-[11px]">
- {notifications.filter(n => !n.read).length}
- </span>
- )}
- </button>
- ))}
- </div>
+        {/* Read status */}
+        <div className="flex items-center gap-1.5">
+          {(['all', 'unread'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3.5 py-2 rounded-full text-[12px] font-medium transition-colors ${
+                filter === f
+                  ? 'bg-[#008085] text-white'
+                  : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {f === 'all' ? 'All' : 'Unread'}
+              {f === 'unread' && unreadCount > 0 && (
+                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${filter === f ? 'bg-white/20' : 'bg-gray-100'}`}>
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
 
- <div className="flex items-center gap-4 shrink-0">
- <label className="flex items-center gap-2 shrink-0 cursor-pointer text-[13px] font-medium text-gray-600 hover:text-near-black transition-colors pl-1">
- <input
- type="checkbox"
- className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
- checked={currentItems.length > 0 && selectedIds.length === currentItems.length}
- onChange={(e) => {
- if (e.target.checked) setSelectedIds(currentItems.map(n => n.id));
- else setSelectedIds([]);
- }}
- />
- Select All
- </label>
- <div className="relative w-[300px] shrink-0">
- <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
- <input 
- type="text"
- placeholder="Search notifications..."
- value={searchQuery}
- onChange={(e) => setSearchQuery(e.target.value)}
- className="h-9 w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors placeholder:text-gray-400"
- />
- </div>
- </div>
- </div>
+        {/* Type filter dropdown */}
+        <select
+          value={typeFilter}
+          onChange={e => setTypeFilter(e.target.value)}
+          className="px-4 py-2.5 rounded-full border border-gray-200 text-[13px] bg-white appearance-none focus:border-[#008085] focus:ring-1 focus:ring-[#008085] outline-none"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='%23999' stroke-width='1.5'/%3E%3C/svg%3E")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 12px center',
+            paddingRight: '32px',
+          }}
+        >
+          <option value="all">All Types</option>
+          <option value="invoices">Invoices</option>
+          <option value="payments">Payments</option>
+          <option value="orders">Orders & Shipments</option>
+          <option value="users">Users</option>
+        </select>
+      </div>
 
- {/* Mobile Toolbar Elements */}
- <div className="flex flex-col sm:hidden">
- {/* Mobile Tab Select */}
- <div className="relative p-3 border-b border-gray-100">
- <select
- value={activeTab}
- onChange={(e) => setActiveTab(e.target.value)}
- className="w-full h-9 rounded-lg border border-gray-200 bg-white text-[13px] pl-3 pr-8 font-medium text-near-black appearance-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
- >
- {TABS.map(tab => (
- <option key={tab} value={tab}>
- {tab} {tab === 'Unread' ? `(${notifications.filter(n => !n.read).length})` : ''}
- </option>
- ))}
- </select>
- <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
- </div>
+      {/* Select All */}
+      {filteredNotifications.length > 0 && (
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={selectedIds.size === filteredNotifications.length && filteredNotifications.length > 0}
+            onChange={toggleSelectAll}
+            className="rounded text-[#008085] focus:ring-[#008085]"
+          />
+          <span className="text-[12px] text-gray-500">
+            {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
+          </span>
+        </div>
+      )}
 
- {/* Mobile Select All & Search */}
- <div className="flex items-center gap-3 p-3 border-b border-gray-100">
- <label className="shrink-0 flex items-center gap-2 cursor-pointer text-[13px] font-medium text-gray-500 hover:text-near-black transition-colors">
- <input
- type="checkbox"
- className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
- checked={currentItems.length > 0 && selectedIds.length === currentItems.length}
- onChange={(e) => {
- if (e.target.checked) setSelectedIds(currentItems.map(n => n.id));
- else setSelectedIds([]);
- }}
- />
- Select All
- </label>
- <div className="relative flex-1 shrink-0">
- <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
- <input 
- type="text"
- placeholder="Search..."
- value={searchQuery}
- onChange={(e) => setSearchQuery(e.target.value)}
- className="h-9 w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors placeholder:text-gray-400"
- />
- </div>
- </div>
- </div>
-
- {/* List Content */}
- <div className="flex-1 flex flex-col">
- {loading ? (
- <div className="flex justify-center py-20">
- <div className="w-8 h-8 flex items-center justify-center rounded-full animate-pulse bg-gray-200"></div>
- </div>
- ) : currentItems.length === 0 ? (
- <div className="flex flex-col items-center justify-center py-24 text-center">
- <div className="w-16 h-16 rounded-full bg-emerald-50 relative flex items-center justify-center mb-5">
- <Bell className="w-7 h-7 text-emerald-600" />
- <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm">
- <CheckCircle className="w-4 h-4 text-emerald-600 fill-white" />
- </div>
- </div>
- <h3 className="text-lg font-medium text-near-black">No notifications yet</h3>
- <p className="text-[14px] text-gray-500 mt-1.5 max-w-[250px] mx-auto">When something important happens, you will see it here.</p>
- </div>
- ) : (
- currentItems.map(notification => {
- const severity = getSeverity(notification.type);
- const isUnread = !notification.read;
- const source = getSource(notification.type, notification.link);
- 
- return (
- <div 
- key={notification.id} 
- className={`group bg-white flex flex-col sm:flex-row sm:items-center gap-0 sm:gap-3 p-3 sm:p-4 transition-colors border-b border-gray-100 last:border-b-0 ${
- selectedIds.includes(notification.id) ? "bg-primary-light/10 border-l-[3px] border-l-[#008085]" :
- isUnread 
- ? "bg-[#FEF0F2]/30 border-l-[3px] border-l-[#008085]" 
- : "hover:bg-gray-50 border-l-[3px] border-transparent"
- }`}
- >
- <div className="flex items-start sm:items-center gap-2 sm:gap-3 w-full sm:w-auto mb-1 sm:mb-0">
- {/* Select Checkbox */}
- <div className="shrink-0 flex items-center justify-center pt-1.5 sm:pt-0 pl-1 sm:pl-2">
- <input
- type="checkbox"
- checked={selectedIds.includes(notification.id)}
- onChange={(e) => {
- if (e.target.checked) setSelectedIds(prev => [...prev, notification.id]);
- else setSelectedIds(prev => prev.filter(id => id !== notification.id));
- }}
- className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
- />
- </div>
- 
- <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center shrink-0">
- {getIcon(notification.type)}
- </div>
-
- <div className="flex-1 min-w-0 sm:hidden">
- <h4 className={`text-[14px] font-medium leading-tight break-words pt-1 ${isUnread ? 'text-near-black' : 'text-gray-500'}`}>
- {notification.title}
- </h4>
- </div>
- </div>
-
- <div className="flex-1 min-w-0 flex flex-col justify-center ml-[36px] sm:ml-0">
- <div className="flex items-center gap-2 flex-wrap sm:mb-0.5">
- <h4 className={`hidden sm:block text-[14px] font-medium ${isUnread ? 'text-near-black' : 'text-gray-500'}`}>
- {notification.title}
- </h4>
- {isUnread && (
- <span className="bg-[#FEF0F2] text-[#008085] text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded shrink-0 leading-none flex items-center mt-[1px]">
- New
- </span>
- )}
- <div className="flex items-center gap-2 text-[11px] text-gray-500 font-medium sm:ml-1 mt-1 sm:mt-0">
- <span className="flex items-center gap-0.5">
- <UserCircle className="w-3.5 h-3.5" />
- {source}
- </span>
- <span className="flex items-center gap-0.5 text-gray-400">
- <Clock className="w-3.5 h-3.5" />
- {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
- </span>
- </div>
- </div>
- <p className={`text-[13px] mt-1 sm:mt-0 ${isUnread ? 'text-gray-700' : 'text-gray-500'} sm:truncate break-words`}>
- {notification.message}
- </p>
- </div>
-
- <div className="flex items-center gap-2 shrink-0 mt-3 sm:mt-0 ml-[36px] sm:ml-0 pr-1 lg:pr-3">
- {isUnread ? (
- <button 
- onClick={() => handleMarkAsRead([notification.id])}
- className="text-[12px] text-gray-500 hover:text-primary px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 bg-gray-50 border border-gray-200 sm:border-transparent hover:bg-gray-100"
- >
- <Check className="w-3.5 h-3.5" />
- Resolve
- </button>
- ) : (
- <span className="text-[12px] font-semibold text-gray-400 px-2.5 py-1.5 rounded-lg flex items-center gap-1 cursor-default bg-transparent">
- <CheckCircle2 className="w-3.5 h-3.5" />
- Resolved
- </span>
- )}
-
- {notification.link && (
- <button 
- onClick={async () => {
- if (!notification.read) await handleMarkAsRead([notification.id]);
- router.push(notification.link!);
- }}
- className="text-[12px] font-semibold text-primary-dark hover:text-primary-dark bg-open-bg hover:bg-primary-light px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 shrink-0"
- >
- View
- <ArrowRight className="w-3.5 h-3.5" />
- </button>
- )}
- </div>
- </div>
- );
- })
- )}
- </div>
- {/* Pagination */}
- {totalPages > 1 && (
- <div className="p-4 flex items-center justify-between text-[13px] font-medium text-gray-500">
- <div>
- Showing <span className="text-near-black">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-near-black">{Math.min(currentPage * itemsPerPage, filteredNotifications.length)}</span> of <span className="text-near-black">{filteredNotifications.length}</span> notifications
- </div>
- <div className="flex items-center gap-2">
- <button 
- onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
- disabled={currentPage === 1}
- className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-white bg-white transition-colors"
- >
- <ChevronLeft className="w-4 h-4" />
- </button>
- <div className="px-2">
- Page {currentPage} of {totalPages}
- </div>
- <button 
- onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
- disabled={currentPage === totalPages}
- className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:hover:bg-white bg-white transition-colors"
- >
- <ChevronRight className="w-4 h-4" />
- </button>
- </div>
- </div>
- )}
- </div>
- </div>
- );
+      {/* Notifications List */}
+      {filteredNotifications.length === 0 ? (
+        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm py-16 text-center">
+          <Bell className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <p className="text-[14px] text-gray-400">
+            {notifications.length === 0 ? "You're all caught up!" : "No notifications match your filters"}
+          </p>
+          <p className="text-[12px] text-gray-300 mt-1">
+            {notifications.length === 0 ? "New notifications will appear here." : "Try adjusting your filters."}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filteredNotifications.map((notif: any) => {
+            const { icon: Icon, bg, color } = getNotificationIcon(notif.notification_type || notif.type);
+            const isSelected = selectedIds.has(notif.id);
+            return (
+              <div
+                key={notif.id}
+                className={`bg-white rounded-[12px] border shadow-sm transition-all ${
+                  isSelected ? 'border-[#008085]' : 'border-gray-200 hover:border-gray-300'
+                } ${!notif.is_read ? 'bg-gradient-to-r from-[#E6F7F5]/30 to-transparent' : ''}`}
+              >
+                <div className="px-5 py-4 flex items-start gap-4">
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelected(notif.id)}
+                    onClick={e => e.stopPropagation()}
+                    className="mt-1.5 rounded text-[#008085] focus:ring-[#008085]"
+                  />
+                  <div className={`w-10 h-10 rounded-full ${bg} flex items-center justify-center shrink-0`}>
+                    <Icon className={`w-5 h-5 ${color}`} />
+                  </div>
+                  <button
+                    onClick={() => handleView(notif)}
+                    className="flex-1 text-left min-w-0"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[14px] font-medium text-near-black">{notif.title}</span>
+                      {!notif.is_read && (
+                        <span className="w-2 h-2 rounded-full bg-[#008085]" />
+                      )}
+                      <span className="text-[11px] text-gray-400 ml-auto flex items-center gap-1 whitespace-nowrap">
+                        <Clock className="w-3 h-3" />
+                        {timeAgo(notif.created_at)}
+                      </span>
+                    </div>
+                    {notif.message && (
+                      <p className="text-[13px] text-gray-500 mt-1 line-clamp-2">{notif.message}</p>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleView(notif)}
+                    className="text-[#008085] hover:text-[#005C5F] transition-colors flex items-center gap-1 text-[12px] font-medium shrink-0"
+                  >
+                    View
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }

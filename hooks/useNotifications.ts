@@ -9,7 +9,7 @@ export type Notification = {
   title: string;
   message: string;
   link: string | null;
-  read: boolean;
+  is_read: boolean;
   created_at: string;
 };
 
@@ -32,7 +32,7 @@ export function useNotifications() {
 
   const fetchNotifications = async (uid: string) => {
     const { data, error } = await supabase
-      .from("notifications")
+      .from("tt_notification")
       .select("*")
       .eq("user_id", uid)
       .order("created_at", { ascending: false })
@@ -40,7 +40,7 @@ export function useNotifications() {
 
     if (!error && data) {
       setNotifications(data);
-      setUnreadCount(data.filter((n) => !n.read).length);
+      setUnreadCount(data.filter((n) => !n.is_read).length);
     }
   };
 
@@ -56,7 +56,7 @@ export function useNotifications() {
         {
           event: "*",
           schema: "public",
-          table: "notifications",
+          table: "tt_notification",
           filter: `user_id=eq.${userId}`,
         },
         () => {
@@ -74,13 +74,13 @@ export function useNotifications() {
     if (!userId || unreadCount === 0) return;
     
     await supabase
-      .from("notifications")
-      .update({ read: true })
+      .from("tt_notification")
+      .update({ is_read: true })
       .eq("user_id", userId)
-      .eq("read", false);
+      .eq("is_read", false);
       
     // Local state update for immediate feedback
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     setUnreadCount(0);
   };
 
@@ -88,12 +88,12 @@ export function useNotifications() {
     if (!userId) return;
     
     await supabase
-      .from("notifications")
-      .update({ read: true })
+      .from("tt_notification")
+      .update({ is_read: true })
       .eq("id", id);
       
     setNotifications((prev) => 
-      prev.map((n) => n.id === id ? { ...n, read: true } : n)
+      prev.map((n) => n.id === id ? { ...n, is_read: true } : n)
     );
     setUnreadCount((count) => Math.max(0, count - 1));
   };
