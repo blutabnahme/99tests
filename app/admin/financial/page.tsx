@@ -1,698 +1,591 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-
 import { useState, useEffect, useMemo } from "react";
-import { 
- CreditCard, TrendingUp, Wallet, PackageSearch, Building2,
- Download, Receipt, ArrowUpRight, FileText, BarChart3, Activity, Users, MapPin, Search
+import {
+  TrendingUp, Wallet, Building2, Receipt, Users, Package,
+  ArrowUpRight, ArrowDownRight, Download
 } from "lucide-react";
-import { 
- LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
- PieChart, Pie, Cell,
- BarChart, Bar
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, Legend
 } from "recharts";
-import { format, subDays, startOfWeek, startOfMonth, startOfYear, isWithinInterval, parseISO } from "date-fns";
-import { Badge } from "@/components/ui/Badge";
-import Link from "next/link";
+import { formatDate } from '@/lib/format-date';
 
-const PIE_COLORS = ['#BE1E2D', '#10B981', '#3B82F6', '#F59E0B'];
-const BAR_COLORS = ['#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'];
+const COLORS = ['#008085', '#005C5F', '#10B981', '#F59E0B', '#3B82F6', '#8B5CF6', '#EC4899'];
+
+function formatCurrency(n: number): string {
+  return `€${Number(n || 0).toFixed(2)}`;
+}
+
+function formatCompact(n: number): string {
+  if (n >= 1000000) return `€${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `€${(n / 1000).toFixed(1)}K`;
+  return `€${n.toFixed(2)}`;
+}
+
+function formatPeriod(key: string): string {
+  // Converts "2026-03" -> "Mar 2026" or "2026-W12" -> "W12 2026"
+  if (key.includes('-W')) {
+    const [year, week] = key.split('-');
+    return `${week} ${year}`;
+  }
+  const [year, month] = key.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[parseInt(month) - 1] || month} ${year}`;
+}
 
 export default function AdminFinancialPage() {
- const [loading, setLoading] = useState(true);
- 
- // Raw Data State
- const [payments, setPayments] = useState<any[]>([]);
- const [recommendations, setCases] = useState<any[]>([]);
- const [refunds, setRefunds] = useState<any[]>([]);
- 
- // Filter State
- const [dateFilter, setDateFilter] = useState<'week'|'month'|'30d'|'90d'|'year'|'all'>('30d');
- const [breakdownView, setBreakdownView] = useState<'weekly'|'monthly'>('monthly');
- const [isSample, setIsSample] = useState(false);
- 
- useEffect(() => {
- async function fetchFinancials() {
- try {
- setLoading(true);
- const res = await fetch('/api/admin/financial');
- if (!res.ok) throw new Error('Failed to fetch');
- const data = await res.json();
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any>(null);
+  const [dateFilter, setDateFilter] = useState<'30d' | '90d' | '6m' | 'year' | 'all'>('all');
+  const [breakdownView, setBreakdownView] = useState<'weekly' | 'monthly'>('monthly');
 
- let processedPayments = data.payments || [];
- let processedCases = data.recommendations || [];
- let processedRefunds = data.refunds || [];
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const res = await fetch('/api/admin/financial');
+        if (res.ok) {
+          const json = await res.json();
+          setData(json);
+        }
+      } catch (err) {
+        console.error('Failed to fetch financial data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
 
- // Generate Sample Data if Empty or if we don't have enough payments yet
- if (processedCases.length < 2 || processedPayments.length === 0) {
- setIsSample(true);
- const dummyCases = [];
- const dummyPayments = [];
- const now = new Date();
- 
- for (let i = 0; i < 200; i++) {
- const d = new Date(now.getTime() - Math.random() * 120 * 24 * 60 * 60 * 1000); // spread over 120 days
- 
- // Funnel simulation
- const r = Math.random();
- const cStatus = r > 0.8 ? 'created' : r > 0.7 ? 'matched' : r > 0.6 ? 'booked' : r > 0.1 ? 'completed' : 'cancelled';
- 
- const bcId = `bc-${Math.floor(Math.random() * 10)}`;
- const bcName = `Collector ${bcId.split('-')[1]}`;
- const hcId = `hc-${Math.floor(Math.random() * 5)}`;
- const hcName = `Klinik ${hcId.split('-')[1]}`;
- 
- const base = 40 + Math.random() * 20;
- const travel = Math.random() * 15;
- const com = (base + travel) * 0.15;
- const orgFee = 25 + Math.random() * 20;
- const matRev = 10 + Math.random() * 10;
- const logRev = 8.5;
- const patientPay = base + travel + orgFee + matRev + logRev;
+  // Filter orders by date
+  const filteredOrders = useMemo(() => {
+    if (!data?.orders) return [];
+    const now = new Date();
+    let cutoff: Date | null = null;
 
- dummyCases.push({
- id: `recommendation-${i}`,
- status: cStatus,
- created_at: d.toISOString(),
- estimated_fees: {
- base_fee: base, travel_fee: travel, commission: com, bc_payout: base + travel - com, doctor_org_fee: orgFee, material_cost: matRev, logistics_fee: logRev
- },
- patient: { address: { city: ['Berlin', 'Munich', 'Hamburg', 'Frankfurt', 'Cologne'][Math.floor(Math.random() * 5)] } },
- doctor_practice: { id: hcId, name: hcName },
- case_application: [{ status: 'accepted', blood_collector: { id: bcId, first_name: bcName.split(' ')[0], last_name: bcName.split(' ')[1], rating: 4 + Math.random() } }]
- });
+    switch (dateFilter) {
+      case '30d': cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); break;
+      case '90d': cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000); break;
+      case '6m': cutoff = new Date(now.getFullYear(), now.getMonth() - 6, 1); break;
+      case 'year': cutoff = new Date(now.getFullYear(), 0, 1); break;
+      default: cutoff = null;
+    }
 
- if (cStatus === 'completed') {
- dummyPayments.push({
- id: `pay-${i}`,
- patient_amount: patientPay,
- status: Math.random() > 0.1 ? 'captured' : 'pending',
- created_at: new Date(d.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(),
- platform_commission: com,
- b2b_fee: orgFee,
- bc_payout: base + travel - com,
- material_revenue: matRev,
- logistics_revenue: logRev,
- vat_amount: patientPay * 0.19,
- bc_id: bcId,
- bc_name: bcName
- });
- }
- }
- processedCases = dummyCases;
- processedPayments = dummyPayments;
- } else {
- // Normalize real data payments to extract bc names easily
- processedPayments = processedPayments.map((p: any) => {
- // Payment API route maps: 'recommendation_id'
- // Find matching recommendation application to grab BC details
- const cMatch = processedCases.find((c: any) => c.id === p.recommendation_id);
- const activeApp = (cMatch?.case_application || []).find((a: any) => ['accepted', 'booked'].includes(a.status));
- const bc = activeApp?.blood_collector;
+    if (!cutoff) return data.orders;
+    return data.orders.filter((o: any) => new Date(o.created_at) >= cutoff!);
+  }, [data?.orders, dateFilter]);
 
- return {
- ...p,
- bc_id: bc?.id,
- bc_name: bc ? `${bc.first_name} ${bc.last_name}` : 'UnknownBC'
- };
- });
- }
+  // Aggregated metrics
+  const metrics = useMemo(() => {
+    const orders = filteredOrders;
+    const totalGMV = orders.reduce((s: number, o: any) => s + Number(o.total || 0), 0);
+    const totalServiceFees = orders.reduce((s: number, o: any) => s + Number(o.service_fee_amount || 0), 0);
+    const totalShipping = orders.reduce((s: number, o: any) => s + Number(o.shipping_cost || 0), 0);
+    const totalLabCosts = orders.reduce((s: number, o: any) => s + Number(o.test_costs_total || 0), 0);
+    const totalVAT = orders.reduce((s: number, o: any) => s + Number(o.vat_amount || 0), 0);
+    const revenue = totalServiceFees + totalShipping;
+    const netMargin = revenue;
+    const avgOrderValue = orders.length > 0 ? totalGMV / orders.length : 0;
 
- setCases(processedCases);
- setPayments(processedPayments);
- setRefunds(processedRefunds);
+    const invoices = data?.invoices || [];
+    const outstandingInvoices = invoices
+      .filter((inv: any) => inv.status === 'sent' || inv.status === 'overdue' || inv.status === 'issued')
+      .reduce((s: number, inv: any) => s + Number(inv.total || inv.gross_total || 0), 0);
 
- } catch (err) {
- console.error("Error fetching financials:", err);
- } finally {
- setLoading(false);
- }
- }
- 
- fetchFinancials();
- }, [dateFilter]);
+    const patientPayOrders = orders.filter((o: any) => o.payment_method === 'patient');
+    const doctorPayOrders = orders.filter((o: any) => o.payment_method === 'doctor_invoice');
 
- const handleReleasePayout = async (bcId: string) => {
- if (!confirm('Release payout for this collector?')) return;
- try {
- setLoading(true);
- const res = await fetch('/api/admin/financial/payouts', {
- method: 'POST',
- headers: { 'Content-Type': 'application/json' },
- body: JSON.stringify({ action: 'release_single', bcId })
- });
- if (res.ok) {
- setPayments(prev => prev.map(p => p.bc_id === bcId && p.payout_status === 'confirmed' ? { ...p, status: 'released', payout_status: 'released' } : p));
- }
- } catch (e) {
- console.error(e);
- } finally {
- setLoading(false);
- }
- };
+    return {
+      totalGMV, totalServiceFees, totalShipping, totalLabCosts, totalVAT,
+      revenue, netMargin, avgOrderValue, outstandingInvoices,
+      orderCount: orders.length,
+      patientPayCount: patientPayOrders.length,
+      patientPayTotal: patientPayOrders.reduce((s: number, o: any) => s + Number(o.total || 0), 0),
+      doctorPayCount: doctorPayOrders.length,
+      doctorPayTotal: doctorPayOrders.reduce((s: number, o: any) => s + Number(o.total || 0), 0),
+    };
+  }, [filteredOrders, data?.invoices]);
 
- const handleReleaseAll = async () => {
- if (!confirm('Release all ready payouts?')) return;
- try {
- setLoading(true);
- const res = await fetch('/api/admin/financial/payouts', {
- method: 'POST',
- headers: { 'Content-Type': 'application/json' },
- body: JSON.stringify({ action: 'release_all' })
- });
- if (res.ok) {
- setPayments(prev => prev.map(p => p.payout_status === 'confirmed' ? { ...p, status: 'released', payout_status: 'released' } : p));
- }
- } catch (e) {
- console.error(e);
- } finally {
- setLoading(false);
- }
- };
+  // Revenue over time
+  const revenueOverTime = useMemo(() => {
+    const orders = filteredOrders;
+    const monthMap = new Map<string, { gmv: number; revenue: number; labCosts: number; shipping: number; vat: number; orders: number }>();
 
- const handleGenerateInvoices = async () => {
- if (!confirm('Generate monthly invoices for all Healthcare Companies? This action cannot be undone.')) return;
- try {
- setLoading(true);
- const res = await fetch('/api/admin/financial/invoices', { method: 'POST' });
- const data = await res.json();
- if (res.ok) {
- alert(`Successfully generated ${data.generated} new invoices.`);
- window.location.reload();
- } else {
- alert(data.error || 'Failed to generate');
- }
- } catch (e) {
- console.error(e);
- } finally {
- setLoading(false);
- }
- };
+    orders.forEach((o: any) => {
+      const d = new Date(o.created_at);
+      const key = breakdownView === 'monthly'
+        ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        : `${d.getFullYear()}-W${String(Math.ceil((d.getDate() + new Date(d.getFullYear(), d.getMonth(), 1).getDay()) / 7)).padStart(2, '0')}`;
 
- // --- Date Range Filter ---
- const filteredDates = useMemo(() => {
- const now = new Date();
- let startD = new Date(0);
- 
- if (dateFilter === 'week') startD = startOfWeek(now);
- if (dateFilter === 'month') startD = startOfMonth(now);
- if (dateFilter === '30d') startD = subDays(now, 30);
- if (dateFilter === '90d') startD = subDays(now, 90);
- if (dateFilter === 'year') startD = startOfYear(now);
+      if (!monthMap.has(key)) monthMap.set(key, { gmv: 0, revenue: 0, labCosts: 0, shipping: 0, vat: 0, orders: 0 });
+      const m = monthMap.get(key)!;
+      m.gmv += Number(o.total || 0);
+      m.revenue += Number(o.service_fee_amount || 0) + Number(o.shipping_cost || 0);
+      m.labCosts += Number(o.test_costs_total || 0);
+      m.shipping += Number(o.shipping_cost || 0);
+      m.vat += Number(o.vat_amount || 0);
+      m.orders += 1;
+    });
 
- return {
- recommendations: recommendations.filter(c => dateFilter === 'all' || isWithinInterval(parseISO(c.created_at), { start: startD, end: now })),
- payments: payments.filter(p => dateFilter === 'all' || isWithinInterval(parseISO(p.created_at), { start: startD, end: now })),
- refunds: refunds.filter(r => dateFilter === 'all' || isWithinInterval(parseISO(r.created_at), { start: startD, end: now }))
- };
- }, [recommendations, payments, refunds, dateFilter]);
+    return Array.from(monthMap.entries())
+      .map(([key, val]) => ({ period: key, ...val }))
+      .sort((a, b) => a.period.localeCompare(b.period));
+  }, [filteredOrders, breakdownView]);
 
- const fCases = filteredDates.recommendations;
- const fPayments = filteredDates.payments;
- const fRefunds = filteredDates.refunds;
+  // Lab costs breakdown
+  const labCostsBreakdown = useMemo(() => {
+    if (!data?.recommendation_items) return [];
+    const labMap = new Map<string, { name: string; total: number; count: number }>();
 
- // --- Aggregate Metrics ---
- const totalRev = fPayments.reduce((acc, p: any) => {
- return acc + Number(p.platform_commission || 0) + Number(p.b2b_fee || 0) + Number(p.material_revenue || 0) + Number(p.logistics_revenue || 0);
- }, 0);
- const totalCommission = fPayments.reduce((acc, p) => acc + (p.platform_commission || 0), 0);
- const totalOrgFees = fPayments.reduce((acc, p) => acc + (p.b2b_fee || 0), 0);
- const totalMatLog = fPayments.reduce((acc, p) => acc + (p.material_revenue || 0) + (p.logistics_revenue || 0), 0);
- const totalVat = fPayments.reduce((acc, p) => acc + (p.vat_amount || 0), 0);
- 
- // Total specifically refunded back to patients
- const totalRefundedSum = fRefunds.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
+    data.recommendation_items.forEach((item: any) => {
+      const labId = item.lab_id;
+      if (!labId) return;
+      const labName = item.laboratory?.name || 'Unknown Lab';
+      if (!labMap.has(labId)) labMap.set(labId, { name: labName, total: 0, count: 0 });
+      const l = labMap.get(labId)!;
+      l.total += Number(item.lab_cost || item.unit_price || 0) * Number(item.quantity || 1);
+      l.count += 1;
+    });
 
- const pendingPayoutsList = fPayments
- .filter(p => p.payout_status === 'confirmed')
- .reduce((acc: any[], p: any) => {
- const amt = p.bc_payout || 0;
- const existing = acc.find(x => x.bcId === p.bc_id);
- if (existing) existing.amount += amt;
- else acc.push({ bcId: p.bc_id, bcName: p.bc_name || 'Collector', amount: amt, nextDate: new Date(new Date().getTime() + 3 * 86400000) });
- return acc;
- }, []);
- const totalPendingPayouts = pendingPayoutsList.reduce((acc: number, p: any) => acc + p.amount, 0);
+    return Array.from(labMap.values()).sort((a, b) => b.total - a.total);
+  }, [data?.recommendation_items]);
 
- // --- 1. Revenue Trend Chart (Daily/Weekly) ---
- const trendData = useMemo(() => {
- const groups: any = {};
- fPayments.forEach(p => {
- const d = parseISO(p.created_at);
- const key = format(d, dateFilter === '90d' || dateFilter === 'year' || dateFilter === 'all' ? 'MMM yyyy' : 'MMM dd');
- if (!groups[key]) groups[key] = { date: key, gross: 0, net: 0, order: d.getTime() };
- 
- const net = (p.platform_commission || 0) + (p.b2b_fee || 0) + (p.material_revenue || 0) + (p.logistics_revenue || 0);
- groups[key].gross += p.patient_amount || 0;
- groups[key].net += net;
- });
- return Object.values(groups).sort((a: any, b: any) => a.order - b.order);
- }, [fPayments, dateFilter]);
+  const invoiceBreakdown = useMemo(() => {
+    if (!data?.invoices) return [];
+    const statusMap = new Map<string, { count: number; total: number }>();
 
- // --- 2. Revenue Breakdown Pie Chart ---
- const pieData = [
- { name: 'Commission', value: totalCommission },
- { name: 'B2B Org Fees', value: totalOrgFees },
- { name: 'Materials', value: fPayments.reduce((a,p) => a + (p.material_revenue || 0), 0) },
- { name: 'Logistics', value: fPayments.reduce((a,p) => a + (p.logistics_revenue || 0), 0) }
- ].filter(d => d.value > 0);
+    data.invoices.forEach((inv: any) => {
+      const s = inv.status || 'unknown';
+      if (!statusMap.has(s)) statusMap.set(s, { count: 0, total: 0 });
+      const m = statusMap.get(s)!;
+      m.count += 1;
+      m.total += Number(inv.total || inv.gross_total || 0);
+    });
 
- // --- 3. Doctor Spending Overview ---
- const hcSpending = useMemo(() => {
- const acc: any = {};
- fCases.forEach(c => {
- if (c.status === 'completed' && c.doctor_practice) {
- const hc = c.doctor_practice;
- if (!acc[hc.id]) acc[hc.id] = { name: hc.name, id: hc.id, spend: 0, recommendations: 0 };
- acc[hc.id].recommendations++;
- acc[hc.id].spend += c.estimated_fees?.doctor_org_fee || 0; 
- }
- });
- return Object.values(acc).sort((a:any, b:any) => b.spend - a.spend).slice(0, 10);
- }, [fCases]);
+    return Array.from(statusMap.entries()).map(([status, val]) => ({
+      status,
+      label: status.charAt(0).toUpperCase() + status.slice(1),
+      ...val,
+    }));
+  }, [data?.invoices]);
 
- // --- 4. Revenue Breakdown Table ---
- const breakdownData = useMemo(() => {
- const groups: any = {};
- fPayments.forEach(p => {
- const d = parseISO(p.created_at);
- const key = format(d, breakdownView === 'weekly' ? "wo '-' yyyy" : "MMM yyyy");
- const displayLabel = breakdownView === 'weekly' 
- ? `Week ${format(d, "ww, yyyy")} (${format(startOfWeek(d, { weekStartsOn: 1 }), "MMM d")} - ${format(new Date(startOfWeek(d, { weekStartsOn: 1 }).getTime() + 6*86400000), "MMM d")})`
- : format(d, "MMMM yyyy");
+  // Top doctors
+  const topDoctors = useMemo(() => {
+    if (!data?.doctors) return [];
+    const docMap = new Map<string, { name: string; practice: string; orders: number; gmv: number; fees: number }>();
 
- if (!groups[key]) {
- groups[key] = {
- key, label: displayLabel, recommendations: 0, patientPayments: 0, bcPayouts: 0, commission: 0,
- orgFees: 0, material: 0, logistics: 0, netRevenue: 0, refundsIssued: 0, order: d.getTime()
- };
- }
- 
- groups[key].recommendations += 1;
- groups[key].patientPayments += p.patient_amount || 0;
- groups[key].bcPayouts += p.bc_payout || 0;
- groups[key].commission += p.platform_commission || 0;
- groups[key].orgFees += p.b2b_fee || 0;
- groups[key].material += p.material_revenue || 0;
- groups[key].logistics += p.logistics_revenue || 0;
- groups[key].netRevenue += (p.platform_commission || 0) + (p.b2b_fee || 0) + (p.material_revenue || 0) + (p.logistics_revenue || 0);
- });
+    filteredOrders.forEach((o: any) => {
+      const docId = o.doctor_id;
+      if (!docId) return;
+      const doc = data.doctors.find((d: any) => d.id === docId);
+      if (!docMap.has(docId)) {
+        docMap.set(docId, {
+          name: doc?.full_name || 'Unknown',
+          practice: doc?.practice_name || '',
+          orders: 0, gmv: 0, fees: 0,
+        });
+      }
+      const d = docMap.get(docId)!;
+      d.orders += 1;
+      d.gmv += Number(o.total || 0);
+      d.fees += Number(o.service_fee_amount || 0);
+    });
 
- fRefunds.forEach(r => {
- const d = parseISO(r.created_at);
- const key = format(d, breakdownView === 'weekly' ? "wo '-' yyyy" : "MMM yyyy");
- const amt = Number(r.amount) || 0;
- if (groups[key]) {
- groups[key].refundsIssued += amt;
- groups[key].netRevenue -= amt; // Deplete net revenue by the refunded penalty
- }
- });
+    return Array.from(docMap.values()).sort((a, b) => b.gmv - a.gmv).slice(0, 10);
+  }, [filteredOrders, data?.doctors]);
 
- return Object.values(groups).sort((a: any, b: any) => b.order - a.order);
- }, [fPayments, fRefunds, breakdownView]);
+  // Payment method split
+  const paymentSplit = useMemo(() => {
+    return [
+      { name: 'Patient Pays', value: metrics.patientPayTotal, count: metrics.patientPayCount },
+      { name: 'Doctor Invoice', value: metrics.doctorPayTotal, count: metrics.doctorPayCount },
+    ].filter(p => p.count > 0);
+  }, [metrics]);
 
- const exportPDF = () => {
- window.print();
- };
+  // Revenue breakdown pie
+  const revenueBreakdown = useMemo(() => {
+    return [
+      { name: 'Service Fees', value: metrics.totalServiceFees },
+      { name: 'Shipping', value: metrics.totalShipping },
+      { name: 'Lab Costs', value: metrics.totalLabCosts },
+    ].filter(p => p.value > 0);
+  }, [metrics]);
 
- return (
- <div className="flex-1 min-w-0 w-full font-body print:p-0 print:m-0 print:max-w-full print:bg-white text-near-black">
- 
- {/* Header & Date Filter */}
- <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 print:mb-4">
- <div>
- <h1 className="font-heading text-[24px] sm:text-[28px] font-medium text-near-black tracking-tight">Financial & Analytics Overview</h1>
- <p className="text-[13px] sm:text-[15px] text-gray-500 mt-1">Consolidated revenue, platform performance, and spatial distributions.</p>
- </div>
- 
- <div className="flex flex-col sm:flex-row gap-3 items-center print:hidden w-full sm:w-auto">
- <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 overflow-x-auto hide-scrollbar max-w-full -mx-1 px-1 w-full sm:w-auto">
- {['week', 'month', '30d', '90d', 'year', 'all'].map(v => (
- <button 
- key={v}
- onClick={() => setDateFilter(v as any)}
- className={`px-4 py-1.5 rounded-md text-[13px] font-semibold whitespace-nowrap shrink-0 transition-colors ${dateFilter === v ? 'bg-white text-primary-dark shadow-sm' : 'text-gray-500 hover:text-near-black'}`}
- >
- {v === 'week' ? 'This Week' : v === 'month' ? 'This Month' : v === '30d' ? '30 Days' : v === '90d' ? '90 Days' : v === 'year' ? 'This Year' : 'All Time'}
- </button>
- ))}
- </div>
- 
- <button onClick={exportPDF} className="flex flex-1 sm:flex-none justify-center w-full sm:w-auto items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 text-[13px] font-semibold rounded-lg transition-colors shrink-0">
- <FileText className="w-4 h-4" /> Export PDF
- </button>
- <button onClick={handleGenerateInvoices} disabled={loading} className="flex flex-1 sm:flex-none justify-center w-full sm:w-auto items-center gap-2 px-4 py-2 bg-primary-dark text-white text-[13px] font-semibold rounded-lg hover:bg-primary transition-colors shrink-0 shadow-sm shadow-primary-dark/20">
- <Receipt className="w-4 h-4" /> Generate Invoices
- </button>
- </div>
- </div>
+  const exportCSV = () => {
+    const rows = [
+      ['Period', 'Orders', 'GMV', 'Service Fees', 'Shipping', 'Lab Costs', 'VAT', 'Net Margin'],
+      ...revenueOverTime.map((r: any) => [
+        r.period,
+        r.orders,
+        r.gmv.toFixed(2),
+        r.revenue.toFixed(2),
+        filteredOrders.filter((o: any) => {
+          const d = new Date(o.created_at);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          return key === r.period;
+        }).reduce((s: number, o: any) => s + Number(o.shipping_cost || 0), 0).toFixed(2),
+        r.labCosts.toFixed(2),
+        filteredOrders.filter((o: any) => {
+          const d = new Date(o.created_at);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          return key === r.period;
+        }).reduce((s: number, o: any) => s + Number(o.vat_amount || 0), 0).toFixed(2),
+        r.revenue.toFixed(2),
+      ]),
+      ['Total', metrics.orderCount, metrics.totalGMV.toFixed(2), metrics.totalServiceFees.toFixed(2), metrics.totalShipping.toFixed(2), metrics.totalLabCosts.toFixed(2), metrics.totalVAT.toFixed(2), metrics.revenue.toFixed(2)],
+    ];
 
- {isSample && (
- <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8 flex items-start gap-3 print:hidden shadow-sm">
- <Activity className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
- <div>
- <h4 className="font-heading text-[14px] font-medium text-amber-900">Showing Sample Data</h4>
- <p className="text-[13px] text-amber-800/80">You are viewing a demonstration of the analytics engine using generated placeholder recommendations because your database does not yet have enough completed payments.</p>
- </div>
- </div>
- )}
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `99tests-financial-${dateFilter}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
- {/* Top Metrics Row */}
- <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4 mb-8 metric-grid">
- <MetricCard title="Net Revenue" value={`€${(totalRev - totalRefundedSum).toFixed(0)}`} icon={CreditCard} highlight />
- <MetricCard title="Total Commission" value={`€${totalCommission.toFixed(0)}`} icon={TrendingUp} />
- <MetricCard title="B2B Org Fees" value={`€${totalOrgFees.toFixed(0)}`} icon={Building2} />
- <MetricCard title="Material & Logistics" value={`€${totalMatLog.toFixed(0)}`} icon={PackageSearch} />
- <MetricCard title="Patient Refunds" value={`€${totalRefundedSum.toFixed(0)}`} icon={Receipt} alert={totalRefundedSum > 0} className="text-red-600" />
- <MetricCard title="Pending BC Payouts" value={`€${totalPendingPayouts.toFixed(0)}`} icon={Wallet} alert={totalPendingPayouts > 0} />
- </div>
+  if (loading) {
+    return <div className="flex justify-center py-20"><LoadingSpinner size="lg" /></div>;
+  }
 
- <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
- 
- {/* 1. Revenue Trend Chart */}
- <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-5 lg:p-6 print:break-inside-avoid">
- <div>
- <h3 className="font-heading text-[16px] sm:text-[18px] font-medium text-near-black">Revenue Trend</h3>
- <p className="text-[13px] text-gray-500 mb-6">Gross patient payments vs Net platform revenue over time.</p>
- </div>
- <div className="h-[300px] w-full overflow-hidden">
- {loading ? <LoadingPlaceholder /> : (
- <ResponsiveContainer width="100%" height="100%">
- <LineChart data={trendData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
- <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
- <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} dy={10} />
- <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} tickFormatter={(val) => `€${val}`} dx={-10} />
- <RechartsTooltip contentStyle={{ borderRadius: '12px', border: '1px solid #E5E7EB', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} formatter={(val: any) => `€${Number(val).toFixed(2)}`} />
- <Legend iconType="circle" wrapperStyle={{ fontSize: '13px', paddingTop: '10px' }} />
- <Line type="monotone" name="Gross Flow (Patient Payments)" dataKey="gross" stroke="#94A3B8" strokeWidth={2} dot={false} activeDot={{ r: 6 }} />
- <Line type="monotone" name="Net Platform Revenue" dataKey="net" stroke="#BE1E2D" strokeWidth={3} dot={{ r: 3, fill: '#BE1E2D', strokeWidth: 0 }} activeDot={{ r: 6 }} />
- </LineChart>
- </ResponsiveContainer>
- )}
- </div>
- </div>
-
- {/* 2. Revenue Breakdown Pie Chart */}
- <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-5 lg:p-6 print:break-inside-avoid">
- <div>
- <h3 className="font-heading text-[16px] sm:text-[18px] font-medium text-near-black">Revenue Composition</h3>
- <p className="text-[13px] text-gray-500 mb-2">Sources of platform net revenue.</p>
- </div>
- <div className="h-[250px] w-full overflow-hidden">
- {loading ? <LoadingPlaceholder /> : (
- <ResponsiveContainer width="100%" height="100%">
- <PieChart>
- <RechartsTooltip formatter={(val: any) => `€${Number(val).toFixed(2)}`} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
- <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={4} dataKey="value" stroke="none">
- {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
- </Pie>
- <Legend iconType="circle" layout="horizontal" verticalAlign="bottom" wrapperStyle={{ fontSize: '12px', marginTop: '10px' }} />
- </PieChart>
- </ResponsiveContainer>
- )}
- </div>
- </div>
-
- </div>
-
- <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
- 
- {/* 3. Top Healthcare Accounts by Spend */}
- <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-5 lg:p-6 print:break-inside-avoid">
- <div className="flex items-center gap-2 mb-6">
- <Building2 className="w-5 h-5 text-emerald-500" />
- <h3 className="font-heading text-[16px] sm:text-[18px] font-medium text-near-black">Top Healthcare Accounts by Spend</h3>
- </div>
- <div className="h-[250px] w-full overflow-hidden">
- {loading ? <LoadingPlaceholder /> : (
- <ResponsiveContainer width="100%" height="100%">
- <BarChart data={hcSpending} margin={{ top: 5, right: 10, left: 0, bottom: 25 }}>
- <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
- <XAxis 
- dataKey="name" 
- axisLine={false} 
- tickLine={false} 
- interval={0}
- tick={(props: any) => {
- const { x, y, payload } = props;
- const hc = hcSpending.find((h: any) => h.name === payload.value);
- const displayVal = payload.value.length > 15 ? payload.value.substring(0,15)+'...' : payload.value;
- return (
- <g transform={`translate(${x},${y})`}>
- <Link href={`/admin/users?tab=healthcare&id=${(hc as any)?.id}`} target="_blank">
- <text x={0} y={0} dy={16} textAnchor="middle" fill="#2563EB" className="text-[11px] font-semibold hover:underline cursor-pointer">
- {displayVal}
- </text>
- </Link>
- </g>
- );
- }} 
- />
- <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} tickFormatter={(val) => `€${val}`} dx={-10} width={50} />
- <RechartsTooltip cursor={{ fill: '#F8FAFC' }} contentStyle={{ borderRadius: '8px' }} formatter={(val: any) => `€${Number(val).toFixed(2)}`} />
- <Bar dataKey="spend" name="Total Fees Paid" fill="#10B981" radius={[4, 4, 0, 0]} barSize={32} />
- </BarChart>
- </ResponsiveContainer>
- )}
- </div>
- </div>
-
- {/* VAT Summary */}
- <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3 sm:p-5 lg:p-6 print:break-inside-avoid flex flex-col items-center justify-center text-center">
- <Receipt className="w-12 h-12 text-gray-500/30 mb-4" />
- <h3 className="font-heading text-[16px] sm:text-[18px] font-medium text-near-black mb-1">VAT Summary</h3>
- <p className="text-[13px] text-gray-500 mb-6">Estimated Value Added Tax collected.</p>
- <div className="text-4xl font-medium text-near-black tracking-tight mb-2">
- €{totalVat.toFixed(2)}
- </div>
- <p className="text-[12px] text-gray-500/70">Based on processed payments</p>
- </div>
- </div>
-
- {/* Revenue Breakdown Table */}
- <div className="bg-white rounded-lg sm:rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8 print:break-inside-avoid">
- <div className="p-4 sm:p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
- <h3 className="font-heading text-[16px] sm:text-[18px] font-medium text-near-black flex items-center gap-2">
- <FileText className="w-5 h-5 text-indigo-500" />
- Revenue Breakdown
- </h3>
- <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 print:hidden w-full sm:w-auto">
- <button 
- onClick={() => setBreakdownView('weekly')}
- className={`flex-1 sm:flex-none px-3 py-1 rounded-md text-[12px] font-semibold transition-colors ${breakdownView === 'weekly' ? 'bg-white text-near-black shadow-sm' : 'text-gray-500'}`}
- >
- Weekly
- </button>
- <button 
- onClick={() => setBreakdownView('monthly')}
- className={`flex-1 sm:flex-none px-3 py-1 rounded-md text-[12px] font-semibold transition-colors ${breakdownView === 'monthly' ? 'bg-white text-near-black shadow-sm' : 'text-gray-500'}`}
- >
- Monthly
- </button>
- </div>
- </div>
- <div className="hidden sm:block overflow-x-auto">
- <table className="w-full text-left whitespace-nowrap">
- <thead>
- <tr className="bg-gray-50 border-b border-gray-200">
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider">Date Range</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-center">Recommendations</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-right">Patient Pay</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-right">BC Payouts</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-right text-primary-dark">Commission</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-right text-emerald-700">Org Fees</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-right text-blue-700">Material</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-right text-amber-700">Logistics</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-right">Refunds</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-right text-near-black">Net Rev</th>
- </tr>
- </thead>
- <tbody className="divide-y divide-gray-50">
- {loading ? (
- <tr><td colSpan={9} className="px-6 py-8 text-center text-gray-500">Loading data...</td></tr>
- ) : breakdownData.length === 0 ? (
- <tr><td colSpan={9} className="px-6 py-8 text-center"><EmptyState /></td></tr>
- ) : (
- breakdownData.map((d: any) => (
- <tr key={d.key} className="hover:bg-gray-50/50 transition-colors">
- <td className="px-6 py-4 text-[14px] font-medium text-near-black">{d.label}</td>
- <td className="px-6 py-4 text-[14px] text-gray-500 text-center">{d.recommendations}</td>
- <td className="px-6 py-4 text-[14px] text-gray-500 text-right">€{d.patientPayments.toFixed(2)}</td>
- <td className="px-6 py-4 text-[14px] text-gray-500 text-right">€{d.bcPayouts.toFixed(2)}</td>
- <td className="px-6 py-4 text-[14px] font-medium text-primary-dark text-right">€{d.commission.toFixed(2)}</td>
- <td className="px-6 py-4 text-[14px] font-medium text-emerald-600 text-right">€{d.orgFees.toFixed(2)}</td>
- <td className="px-6 py-4 text-[14px] font-medium text-blue-600 text-right">€{d.material.toFixed(2)}</td>
- <td className="px-6 py-4 text-[14px] font-medium text-amber-600 text-right">€{d.logistics.toFixed(2)}</td>
- <td className="px-6 py-4 text-[14px] font-medium text-red-600 text-right">€{d.refundsIssued.toFixed(2)}</td>
- <td className="px-6 py-4 text-[14px] font-bold text-near-black text-right">€{d.netRevenue.toFixed(2)}</td>
- </tr>
- ))
- )}
- </tbody>
- {breakdownData.length > 0 && !loading && (
- <tfoot className="bg-gray-50 border-t border-gray-200 font-bold text-[14px]">
- <tr>
- <td className="px-6 py-4 text-near-black">Total</td>
- <td className="px-6 py-4 text-center text-near-black">{breakdownData.reduce((a:any, b:any) => a + b.recommendations, 0) as number}</td>
- <td className="px-6 py-4 text-right text-near-black">€{(breakdownData.reduce((a:any, b:any) => a + b.patientPayments, 0) as number).toFixed(2)}</td>
- <td className="px-6 py-4 text-right text-near-black">€{(breakdownData.reduce((a:any, b:any) => a + b.bcPayouts, 0) as number).toFixed(2)}</td>
- <td className="px-6 py-4 text-right text-primary-dark">€{totalCommission.toFixed(2)}</td>
- <td className="px-6 py-4 text-right text-emerald-600">€{totalOrgFees.toFixed(2)}</td>
- <td className="px-6 py-4 text-right text-blue-600">€{fPayments.reduce((a:any,p:any) => a + (p.material_revenue || 0), 0).toFixed(2)}</td>
- <td className="px-6 py-4 text-right text-amber-600">€{fPayments.reduce((a:any,p:any) => a + (p.logistics_revenue || 0), 0).toFixed(2)}</td>
- <td className="px-6 py-4 text-right text-red-600">€{totalRefundedSum.toFixed(2)}</td>
- <td className="px-6 py-4 text-right text-near-black">€{(totalRev - totalRefundedSum).toFixed(2)}</td>
- </tr>
- </tfoot>
- )}
- </table>
- </div>
-
- {/* Mobile View */}
- <div className="block sm:hidden">
- {loading ? (
- <div className="p-8 text-center text-[13px] text-gray-500">Loading data...</div>
- ) : breakdownData.length === 0 ? (
- <div className="p-8 text-center text-[13px] text-gray-500">No data available</div>
- ) : (
- breakdownData.map((d: any) => (
- <div key={d.key} className="p-4 border-b border-gray-100 last:border-b-0">
- <div className="flex justify-between items-center mb-1">
- <div className="text-[14px] font-medium text-near-black">{d.label}</div>
- <div className="text-[13px] font-medium text-near-black">{d.recommendations} recommendations</div>
- </div>
- <div className="flex justify-between items-center text-[13px] text-gray-500">
- <div>Patient Pay: €{d.patientPayments.toFixed(2)}</div>
- <div className="font-bold text-near-black">Net: €{d.netRevenue.toFixed(2)}</div>
- </div>
- </div>
- ))
- )}
- </div>
- </div>
-
- {/* Pending Payouts Table */}
- <div className="bg-white rounded-lg sm:rounded-2xl border border-gray-200 shadow-sm overflow-hidden print:break-inside-avoid">
- <div className="p-4 sm:p-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
- <h3 className="font-heading text-[16px] sm:text-[18px] font-medium text-near-black flex items-center gap-2">
- <Wallet className="w-5 h-5 text-amber-500" />
- Pending BC Payouts
- </h3>
- {totalPendingPayouts > 0 && (
- <div className="flex gap-3">
- <Badge variant="warning">Action Required</Badge>
- <button 
- onClick={handleReleaseAll}
- disabled={loading}
- className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-[12px] font-bold"
- >
- Release All
- </button>
- </div>
- )}
- </div>
- <div className="hidden sm:block overflow-x-auto">
- <table className="w-full text-left">
- <thead>
- <tr className="bg-gray-50 border-b border-gray-200">
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider">Blood Collector</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider">Next Payout Date</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-right">Outstanding Balance</th>
- <th className="px-6 py-3 text-[12px] font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
- </tr>
- </thead>
- <tbody className="divide-y divide-gray-50">
- {loading ? (
- <tr><td colSpan={3} className="px-6 py-8 text-center text-gray-500">Loading data...</td></tr>
- ) : pendingPayoutsList.length === 0 ? (
- <tr><td colSpan={3} className="px-6 py-8 text-center text-gray-500">No pending payouts at this time.</td></tr>
- ) : (
- pendingPayoutsList.map((p: any) => (
- <tr key={p.bcId} className="hover:bg-gray-50/50 transition-colors">
- <td className="px-6 py-4">
- <Link href={`/admin/users?tab=blood_collectors&id=${p.bcId}`} className="text-[14px] font-bold text-blue-600 hover:underline">
- {p.bcName}
- </Link>
- </td>
- <td className="px-6 py-4 text-[14px] text-gray-500">
- {format(p.nextDate, 'MMM dd, yyyy')}
- </td>
- <td className="px-6 py-4 text-right text-[14px] font-bold text-near-black">
- €{p.amount.toFixed(2)}
- </td>
- <td className="px-6 py-4 text-right">
- <button 
- onClick={() => handleReleasePayout(p.bcId)}
- disabled={loading}
- className="px-3 py-1.5 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-md text-[12px] font-bold"
- >
- Release Payout
- </button>
- </td>
- </tr>
- ))
- )}
- </tbody>
- </table>
- </div>
-
- <div className="block sm:hidden">
- {loading ? (
- <div className="p-8 text-center text-[13px] text-gray-500">Loading...</div>
- ) : pendingPayoutsList.length === 0 ? (
- <div className="p-8 text-center text-[13px] text-gray-500">No pending payouts at this time.</div>
- ) : (
- pendingPayoutsList.map((p: any) => (
- <div key={p.bcId} className="p-4 border-b border-gray-100 last:border-b-0">
- <div className="flex justify-between items-center mb-1">
- <Link href={`/admin/users?tab=blood_collectors&id=${p.bcId}`} className="text-[14px] font-bold text-blue-600 hover:underline">
- {p.bcName}
- </Link>
- <div className="text-[14px] font-bold text-near-black">€{p.amount.toFixed(2)}</div>
- </div>
- <div className="text-[13px] text-gray-500">Next Payout: {format(p.nextDate, 'MMM dd, yyyy')}</div>
- </div>
- ))
- )}
- </div>
- </div>
- </div>
- );
-}
-
-// --- Helper Components ---
-function MetricCard({ title, value, icon: Icon, alert, highlight, className }: { title: string; value: string | number; icon: any; alert?: boolean, highlight?: boolean, className?: string }) {
   return (
-    <div className={`rounded-2xl border p-3 sm:p-5 shadow-sm flex flex-col justify-between ${highlight ? 'bg-gradient-to-br from-primary to-primary-dark border-transparent text-white' : 'bg-white border-gray-200 print:shadow-none print:border-gray-300'} print:break-inside-avoid`}>
-      <div className="flex justify-between items-start mb-3 sm:mb-4">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${highlight ? 'bg-white/20' : 'bg-gray-50'}`}>
-          <Icon className={`w-5 h-5 ${highlight ? 'text-white' : 'text-gray-600'}`} />
+    <div className="space-y-6 font-body">
+      {/* Header + Date Filter */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="font-heading font-medium text-[24px] sm:text-[28px] text-near-black">Financial Overview</h1>
+          <p className="text-[13px] text-gray-500 mt-1">Revenue, costs, and billing analytics.</p>
         </div>
-        {alert && <div className="w-2 h-2 rounded-full bg-red-500 shadow-sm animate-pulse" />}
+        <div className="flex items-center gap-1.5">
+          {(['30d', '90d', '6m', 'year', 'all'] as const).map(f => (
+            <button
+              key={f}
+              onClick={() => setDateFilter(f)}
+              className={`px-3.5 py-2 rounded-full text-[12px] font-medium transition-colors ${
+                dateFilter === f
+                  ? 'bg-[#008085] text-white'
+                  : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {f === '30d' ? '30 Days' : f === '90d' ? '90 Days' : f === '6m' ? '6 Months' : f === 'year' ? 'This Year' : 'All Time'}
+            </button>
+          ))}
+          <button
+            onClick={exportCSV}
+            className="px-4 py-2 rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 text-[12px] font-medium transition-colors flex items-center gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export CSV
+          </button>
+        </div>
       </div>
-      <div>
-        <div className={`text-[13px] sm:text-[14px] font-medium mb-1 ${highlight ? 'text-white/80' : 'text-gray-500'}`}>{title}</div>
-        <div className={`text-[20px] sm:text-[24px] font-bold tracking-tight ${className || (highlight ? 'text-white' : 'text-near-black')}`}>{value}</div>
+
+      {/* Metrics Row 1 */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'GMV', value: formatCompact(metrics.totalGMV), sub: `${metrics.orderCount} orders`, icon: TrendingUp, color: 'text-[#008085]', bg: 'bg-teal-50' },
+          { label: 'Revenue', value: formatCompact(metrics.revenue), sub: 'Fees + Shipping', icon: Wallet, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Lab Costs', value: formatCompact(metrics.totalLabCosts), sub: 'Passed to labs', icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Net Margin', value: formatCompact(metrics.netMargin), sub: `${metrics.totalGMV > 0 ? ((metrics.netMargin / metrics.totalGMV) * 100).toFixed(1) : 0}% of GMV`, icon: ArrowUpRight, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        ].map((m, i) => (
+          <div key={i} className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`w-8 h-8 rounded-full ${m.bg} flex items-center justify-center`}>
+                <m.icon className={`w-4 h-4 ${m.color}`} />
+              </div>
+            </div>
+            <div className="text-[20px] font-heading font-medium text-near-black">{m.value}</div>
+            <div className="text-[12px] text-gray-400 mt-0.5">{m.label}</div>
+            {m.sub && <div className="text-[11px] text-gray-300 mt-0.5">{m.sub}</div>}
+          </div>
+        ))}
       </div>
-    </div>
-  );
-}
 
-function LoadingPlaceholder() {
-  return (
-    <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
-      <LoadingSpinner size="lg" />
-      <span className="text-[12px] mt-2">Loading analytics...</span>
-    </div>
-  );
-}
+      {/* Metrics Row 2 */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'VAT Collected', value: formatCompact(metrics.totalVAT), sub: 'On fees & shipping', icon: Receipt, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Outstanding', value: formatCompact(metrics.outstandingInvoices), sub: 'Unpaid invoices', icon: Receipt, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Shipping Revenue', value: formatCompact(metrics.totalShipping), sub: `${metrics.orderCount > 0 ? (metrics.totalShipping / metrics.orderCount).toFixed(2) : 0} avg/order`, icon: Package, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Avg. Order Value', value: formatCompact(metrics.avgOrderValue), sub: 'Per order', icon: Users, color: 'text-gray-600', bg: 'bg-gray-50' },
+        ].map((m, i) => (
+          <div key={i} className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`w-8 h-8 rounded-full ${m.bg} flex items-center justify-center`}>
+                <m.icon className={`w-4 h-4 ${m.color}`} />
+              </div>
+            </div>
+            <div className="text-[20px] font-heading font-medium text-near-black">{m.value}</div>
+            <div className="text-[12px] text-gray-400 mt-0.5">{m.label}</div>
+            {m.sub && <div className="text-[11px] text-gray-300 mt-0.5">{m.sub}</div>}
+          </div>
+        ))}
+      </div>
 
-function EmptyState() {
-  return (
-    <div className="w-full h-full flex flex-col items-center justify-center text-gray-500/60 text-center px-4">
-      <Activity className="w-6 h-6 mb-2 opacity-50" />
-      <span className="text-[12px]">Showing sample data — real data will appear as more recommendations are processed.</span>
+      {/* Charts Row 1: Revenue Over Time + Revenue Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Revenue Over Time — 2/3 width */}
+        <div className="lg:col-span-2 bg-white rounded-[16px] border border-gray-200 shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-heading font-medium text-[16px] text-near-black" style={{ textTransform: 'none' }}>Revenue Over Time</h2>
+            <div className="flex items-center gap-1">
+              {(['weekly', 'monthly'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setBreakdownView(v)}
+                  className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors ${
+                    breakdownView === v ? 'bg-gray-100 text-near-black' : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  {v === 'weekly' ? 'Weekly' : 'Monthly'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {revenueOverTime.length === 0 ? (
+            <div className="h-[250px] flex items-center justify-center text-gray-400 text-[14px]">No data for this period</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={revenueOverTime}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="period" tick={{ fontSize: 11 }} stroke="#ccc" tickFormatter={formatPeriod} />
+                <YAxis tick={{ fontSize: 11 }} stroke="#ccc" tickFormatter={(v) => `€${v}`} />
+                <RechartsTooltip
+                  formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line type="monotone" dataKey="gmv" name="GMV" stroke="#008085" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#10B981" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="labCosts" name="Lab Costs" stroke="#3B82F6" strokeWidth={2} dot={false} strokeDasharray="4 4" />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Revenue Breakdown — 1/3 width */}
+        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-6">
+          <h2 className="font-heading font-medium text-[16px] text-near-black mb-4" style={{ textTransform: 'none' }}>Where Money Goes</h2>
+          {revenueBreakdown.length === 0 ? (
+            <div className="h-[250px] flex items-center justify-center text-gray-400 text-[14px]">No data</div>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={revenueBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
+                    {revenueBreakdown.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2 mt-2">
+                {revenueBreakdown.map((item, i) => {
+                  const totalValue = revenueBreakdown.reduce((s, p) => s + p.value, 0);
+                  const pct = totalValue > 0 ? ((item.value / totalValue) * 100).toFixed(1) : '0';
+                  return (
+                    <div key={item.name} className="flex items-center justify-between text-[13px]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                        <span className="text-gray-600">{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-400">{pct}%</span>
+                        <span className="font-mono text-near-black">{formatCurrency(item.value)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Charts Row 2: Lab Costs + Payment Split */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Lab Costs by Laboratory — 2/3 width */}
+        <div className="lg:col-span-2 bg-white rounded-[16px] border border-gray-200 shadow-sm p-6">
+          <h2 className="font-heading font-medium text-[16px] text-near-black mb-4" style={{ textTransform: 'none' }}>Lab Costs by Laboratory</h2>
+          {labCostsBreakdown.length === 0 ? (
+            <div className="h-[250px] flex items-center justify-center text-gray-400 text-[14px]">No lab data</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={Math.max(200, labCostsBreakdown.length * 45)}>
+              <BarChart data={labCostsBreakdown} layout="vertical" margin={{ left: 0, right: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 11 }} stroke="#ccc" tickFormatter={(v) => `€${v}`} />
+                <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} stroke="#ccc" />
+                <RechartsTooltip
+                  formatter={(value: number) => [formatCurrency(value), 'Total Cost']}
+                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
+                />
+                <Bar dataKey="total" fill="#3B82F6" radius={[0, 4, 4, 0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Payment Method Split — 1/3 width */}
+        <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-6">
+          <h2 className="font-heading font-medium text-[16px] text-near-black mb-4" style={{ textTransform: 'none' }}>Payment Methods</h2>
+          {paymentSplit.length === 0 ? (
+            <div className="h-[200px] flex items-center justify-center text-gray-400 text-[14px]">No data</div>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={paymentSplit} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
+                    {paymentSplit.map((_, i) => (
+                      <Cell key={i} fill={i === 0 ? '#008085' : '#F59E0B'} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip formatter={(value: number) => formatCurrency(value)} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2 mt-2">
+                {paymentSplit.map((item, i) => {
+                  const totalValue = paymentSplit.reduce((s, p) => s + p.value, 0);
+                  const pct = totalValue > 0 ? ((item.value / totalValue) * 100).toFixed(1) : '0';
+                  return (
+                    <div key={item.name} className="flex items-center justify-between text-[13px]">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: i === 0 ? '#008085' : '#F59E0B' }} />
+                        <span className="text-gray-600">{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-400">{pct}%</span>
+                        <span className="font-mono text-near-black">{formatCurrency(item.value)}</span>
+                        <span className="text-gray-400 ml-1.5 text-[11px]">({item.count})</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Invoice Status Breakdown */}
+      <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm p-6">
+        <h2 className="font-heading font-medium text-[16px] text-near-black mb-4" style={{ textTransform: 'none' }}>Invoice Status</h2>
+        {invoiceBreakdown.length === 0 ? (
+          <div className="py-6 text-center text-gray-400 text-[14px]">No invoices yet</div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {invoiceBreakdown.map((item: any) => {
+              const colorMap: Record<string, string> = {
+                issued: 'text-gray-600 bg-gray-50',
+                sent: 'text-blue-600 bg-blue-50',
+                paid: 'text-emerald-600 bg-emerald-50',
+                overdue: 'text-red-600 bg-red-50',
+                cancelled: 'text-gray-400 bg-gray-50',
+              };
+              const colors = colorMap[item.status] || 'text-gray-600 bg-gray-50';
+              const [textColor, bgColor] = colors.split(' ');
+              return (
+                <div key={item.status} className={`rounded-[12px] p-4 ${bgColor}`}>
+                  <div className={`text-[20px] font-heading font-medium ${textColor}`}>{item.count}</div>
+                  <div className="text-[13px] text-gray-600 mt-0.5">{item.label}</div>
+                  <div className="text-[12px] text-gray-400 font-mono mt-1">{formatCurrency(item.total)}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Top Doctors Table */}
+      <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="font-heading font-medium text-[16px] text-near-black" style={{ textTransform: 'none' }}>Top Doctors by GMV</h2>
+        </div>
+        {topDoctors.length === 0 ? (
+          <div className="py-10 text-center text-gray-400 text-[14px]">No doctor data</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="bg-gray-50/50">
+                  <th className="text-center px-4 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider w-12">#</th>
+                  <th className="text-left px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Doctor</th>
+                  <th className="text-left px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Practice</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Orders</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">GMV</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Service Fees</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {topDoctors.map((doc: any, i: number) => (
+                  <tr key={i} className="hover:bg-gray-50/30">
+                    <td className="px-4 py-3 text-center text-[12px] text-gray-400 font-mono">{i + 1}</td>
+                    <td className="px-6 py-3 font-medium text-near-black">{doc.name}</td>
+                    <td className="px-6 py-3 text-gray-500">{doc.practice || '—'}</td>
+                    <td className="px-6 py-3 text-right font-mono text-gray-600">{doc.orders}</td>
+                    <td className="px-6 py-3 text-right font-mono font-medium text-near-black">{formatCurrency(doc.gmv)}</td>
+                    <td className="px-6 py-3 text-right font-mono text-[#008085]">{formatCurrency(doc.fees)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Monthly Breakdown Table */}
+      <div className="bg-white rounded-[16px] border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="font-heading font-medium text-[16px] text-near-black" style={{ textTransform: 'none' }}>Monthly Breakdown</h2>
+        </div>
+        {revenueOverTime.length === 0 ? (
+          <div className="py-10 text-center text-gray-400 text-[14px]">No data for this period</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="bg-gray-50/50">
+                  <th className="text-left px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Period</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Orders</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">GMV</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Service Fees</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Shipping</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Lab Costs</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">VAT</th>
+                  <th className="text-right px-6 py-3 text-[11px] font-medium text-gray-400 uppercase tracking-wider">Net Margin</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {revenueOverTime.map((row: any) => (
+                  <tr key={row.period} className="hover:bg-gray-50/30">
+                    <td className="px-6 py-3 font-medium text-near-black">{formatPeriod(row.period)}</td>
+                    <td className="px-6 py-3 text-right font-mono text-gray-600">{row.orders}</td>
+                    <td className="px-6 py-3 text-right font-mono text-near-black">{formatCurrency(row.gmv)}</td>
+                    <td className="px-6 py-3 text-right font-mono text-[#008085]">{formatCurrency(row.revenue - row.shipping)}</td>
+                    <td className="px-6 py-3 text-right font-mono text-indigo-600">{formatCurrency(row.shipping)}</td>
+                    <td className="px-6 py-3 text-right font-mono text-blue-600">{formatCurrency(row.labCosts)}</td>
+                    <td className="px-6 py-3 text-right font-mono text-purple-600">{formatCurrency(row.vat)}</td>
+                    <td className="px-6 py-3 text-right font-mono font-medium text-emerald-600">{formatCurrency(row.revenue)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gray-50 font-medium">
+                  <td className="px-6 py-3 text-near-black">Total</td>
+                  <td className="px-6 py-3 text-right font-mono text-near-black">{metrics.orderCount}</td>
+                  <td className="px-6 py-3 text-right font-mono text-near-black">{formatCurrency(metrics.totalGMV)}</td>
+                  <td className="px-6 py-3 text-right font-mono text-[#008085]">{formatCurrency(metrics.totalServiceFees)}</td>
+                  <td className="px-6 py-3 text-right font-mono text-indigo-600">{formatCurrency(metrics.totalShipping)}</td>
+                  <td className="px-6 py-3 text-right font-mono text-blue-600">{formatCurrency(metrics.totalLabCosts)}</td>
+                  <td className="px-6 py-3 text-right font-mono text-purple-600">{formatCurrency(metrics.totalVAT)}</td>
+                  <td className="px-6 py-3 text-right font-mono font-medium text-emerald-600">{formatCurrency(metrics.revenue)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
