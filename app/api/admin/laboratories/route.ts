@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
  let query = supabaseAdmin
  .from('tt_laboratory')
- .select('id, name, official_name, practice_name, slug, address_city, aisid, is_active, created_at');
+ .select('id, name, official_name, practice_name, slug, address_street, address_zip, address_city, address_country, contact_email, contact_phone, aisid, customer_number, is_active, is_private, ldt_config, pad_config, created_at');
 
  if (active_only) {
  query = query.eq('is_active', true);

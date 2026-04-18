@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { X, ChevronDown, ChevronRight, Loader2, Search, UserPlus, Trash2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 interface LaboratoryModalProps {
@@ -36,17 +36,28 @@ export default function LaboratoryModal({ lab, onClose, onSuccess }: LaboratoryM
  customer_number: ''
  });
 
+ const [ldtEnabled, setLdtEnabled] = useState(false);
  const [ldtConfig, setLdtConfig] = useState({
  einsender_id: '',
- charset: '4', // 4=ISO-8859-15
+ customer_number: '',
+ charset: '4',
  version: 'LDT4.20',
  profile_category_label: '',
  filename_prefix: ''
  });
 
+ const [padEnabled, setPadEnabled] = useState(false);
  const [padConfigStr, setPadConfigStr] = useState('{}');
  const [showLdt, setShowLdt] = useState(false);
  const [showPad, setShowPad] = useState(false);
+
+ // Private lab
+ const [isPrivate, setIsPrivate] = useState(false);
+ const [linkedDoctors, setLinkedDoctors] = useState<any[]>([]);
+ const [doctorSearch, setDoctorSearch] = useState('');
+ const [doctorResults, setDoctorResults] = useState<any[]>([]);
+ const [searchingDoctors, setSearchingDoctors] = useState(false);
+ const [addingDoctor, setAddingDoctor] = useState(false);
 
  useEffect(() => {
  if (lab) {
@@ -65,8 +76,10 @@ export default function LaboratoryModal({ lab, onClose, onSuccess }: LaboratoryM
  customer_number: lab.customer_number || ''
  });
  if (lab.ldt_config) {
+ setLdtEnabled(lab.ldt_config.enabled === true);
  setLdtConfig({
  einsender_id: lab.ldt_config.einsender_id || '',
+ customer_number: lab.ldt_config.customer_number || lab.customer_number || '',
  charset: lab.ldt_config.charset || '4',
  version: lab.ldt_config.version || 'LDT4.20',
  profile_category_label: lab.ldt_config.profile_category_label || '',
@@ -74,10 +87,79 @@ export default function LaboratoryModal({ lab, onClose, onSuccess }: LaboratoryM
  });
  }
  if (lab.pad_config) {
- setPadConfigStr(JSON.stringify(lab.pad_config, null, 2));
+ setPadEnabled(lab.pad_config.enabled === true);
+ const { enabled, ...rest } = lab.pad_config;
+ setPadConfigStr(Object.keys(rest).length > 0 ? JSON.stringify(rest, null, 2) : '{}');
  }
  }
  }, [lab]);
+
+ // Load is_private state
+ useEffect(() => {
+   if (lab) {
+     setIsPrivate(lab.is_private === true);
+   }
+ }, [lab]);
+
+ // Fetch linked doctors for private lab
+ useEffect(() => {
+   if (lab && isPrivate) {
+     fetch(`/api/admin/laboratories/${lab.id}/doctors`)
+       .then(r => r.json())
+       .then(data => { if (Array.isArray(data)) setLinkedDoctors(data); })
+       .catch(() => {});
+   }
+ }, [lab, isPrivate]);
+
+ // Doctor search
+ useEffect(() => {
+   if (!doctorSearch || doctorSearch.length < 2) {
+     setDoctorResults([]);
+     return;
+   }
+   const timer = setTimeout(async () => {
+     setSearchingDoctors(true);
+     try {
+       const res = await fetch(`/api/admin/users?type=doctors&search=${encodeURIComponent(doctorSearch)}&limit=5`);
+       if (res.ok) {
+         const data = await res.json();
+         const doctors = Array.isArray(data) ? data : data.data || [];
+         // Filter out already-linked doctors
+         const linkedIds = new Set(linkedDoctors.map((ld: any) => ld.doctor_id));
+         setDoctorResults(doctors.filter((d: any) => !linkedIds.has(d.id)));
+       }
+     } catch {}
+     setSearchingDoctors(false);
+   }, 300);
+   return () => clearTimeout(timer);
+ }, [doctorSearch, linkedDoctors]);
+
+ const handleAddDoctor = async (doctorId: string) => {
+   if (!lab) return;
+   setAddingDoctor(true);
+   try {
+     const res = await fetch(`/api/admin/laboratories/${lab.id}/doctors`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ doctor_id: doctorId })
+     });
+     if (res.ok) {
+       const newEntry = await res.json();
+       setLinkedDoctors(prev => [newEntry, ...prev]);
+       setDoctorSearch('');
+       setDoctorResults([]);
+     }
+   } catch {}
+   setAddingDoctor(false);
+ };
+
+ const handleRemoveDoctor = async (doctorId: string) => {
+   if (!lab) return;
+   try {
+     await fetch(`/api/admin/laboratories/${lab.id}/doctors?doctor_id=${doctorId}`, { method: 'DELETE' });
+     setLinkedDoctors(prev => prev.filter((d: any) => d.doctor_id !== doctorId));
+   } catch {}
+ };
 
  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
  setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -103,8 +185,9 @@ export default function LaboratoryModal({ lab, onClose, onSuccess }: LaboratoryM
 
  const payload = {
  ...formData,
- ldt_config: ldtConfig,
- pad_config: parsedPad
+ is_private: isPrivate,
+ ldt_config: { ...ldtConfig, enabled: ldtEnabled },
+ pad_config: { ...parsedPad, enabled: padEnabled }
  };
 
  try {
@@ -218,17 +301,129 @@ export default function LaboratoryModal({ lab, onClose, onSuccess }: LaboratoryM
  </div>
  </div>
 
+ {/* Private Laboratory */}
+ <div className="border border-gray-200 rounded-[12px] overflow-hidden">
+ <div className="p-4 bg-gray-50/50 space-y-4">
+ <label className="flex items-center gap-3 cursor-pointer">
+ <input
+ type="checkbox"
+ checked={isPrivate}
+ onChange={(e) => setIsPrivate(e.target.checked)}
+ className="w-5 h-5 rounded border-gray-300 text-[#008085] focus:ring-[#008085]"
+ />
+ <div className="flex items-center gap-2">
+ <Lock className="w-4 h-4 text-gray-500" />
+ <div>
+ <span className="text-[14px] font-medium text-near-black">Private Laboratory</span>
+ <p className="text-[12px] text-gray-500">Only assigned doctors can see this lab's tests in their catalog</p>
+ </div>
+ </div>
+ </label>
+
+ {isPrivate && isEditing && (
+ <div className="pt-3 border-t border-gray-200 space-y-3">
+ {/* Doctor Search */}
+ <div className="relative">
+ <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+ <input
+ type="text"
+ autoComplete="off"
+ placeholder="Search doctors by name or email..."
+ value={doctorSearch}
+ onChange={(e) => setDoctorSearch(e.target.value)}
+ className="w-full h-10 pl-10 pr-10 text-[14px] rounded-full border border-gray-200 focus:border-[#008085] focus:ring-1 focus:ring-[#008085] outline-none transition-colors placeholder:text-gray-400"
+ />
+ <div className={`absolute right-3 top-1/2 -translate-y-1/2 transition-opacity ${searchingDoctors ? 'opacity-100' : 'opacity-0'}`}>
+ <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+ </div>
+ </div>
+
+ {/* Search Results Dropdown */}
+ {doctorResults.length > 0 && (
+ <div className="bg-white border border-gray-200 rounded-[12px] shadow-sm overflow-hidden">
+ {doctorResults.map((doc: any) => (
+ <button
+ key={doc.id}
+ type="button"
+ onClick={() => handleAddDoctor(doc.id)}
+ disabled={addingDoctor}
+ className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
+ >
+ <UserPlus className="w-4 h-4 text-[#008085] shrink-0" />
+ <div className="flex-1 min-w-0">
+ <div className="text-[14px] font-medium text-near-black truncate">{doc.full_name || 'Unnamed'}</div>
+ <div className="text-[12px] text-gray-500 truncate">{doc.email}{doc.practice_name ? ` · ${doc.practice_name}` : ''}</div>
+ </div>
+ </button>
+ ))}
+ </div>
+ )}
+
+ {/* Linked Doctors List */}
+ <div className="space-y-1">
+ <label className="text-[12px] font-medium text-gray-500 uppercase tracking-wider">
+ Authorized Doctors ({linkedDoctors.length})
+ </label>
+ {linkedDoctors.length === 0 ? (
+ <p className="text-[13px] text-gray-400 py-2">No doctors assigned yet. Search above to add.</p>
+ ) : (
+ <div className="space-y-1">
+ {linkedDoctors.map((entry: any) => (
+ <div key={entry.id} className="flex items-center gap-3 px-3 py-2 rounded-[8px] bg-white border border-gray-100">
+ <div className="flex-1 min-w-0">
+ <div className="text-[13px] font-medium text-near-black truncate">{entry.doctor?.full_name || 'Unknown'}</div>
+ <div className="text-[11px] text-gray-500 truncate">{entry.doctor?.email}{entry.doctor?.practice_name ? ` · ${entry.doctor.practice_name}` : ''}</div>
+ </div>
+ <button
+ type="button"
+ onClick={() => handleRemoveDoctor(entry.doctor_id)}
+ className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors shrink-0"
+ title="Remove access"
+ >
+ <Trash2 className="w-3.5 h-3.5" />
+ </button>
+ </div>
+ ))}
+ </div>
+ )}
+ </div>
+ </div>
+ )}
+ </div>
+ </div>
+
  {/* LDT Config */}
  <div className="border border-gray-200 rounded-[12px] overflow-hidden">
  <button type="button" onClick={() => setShowLdt(!showLdt)} className="w-full flex items-center justify-between p-4 bg-gray-50/50 hover:bg-gray-100/50 transition-colors text-left">
+ <div className="flex items-center gap-3">
  <span className="font-medium text-[14px] text-near-black">LDT Configuration</span>
+ {ldtEnabled && <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Enabled</span>}
+ </div>
  {showLdt ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
  </button>
  {showLdt && (
- <div className="p-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
+ <div className="p-4 border-t border-gray-200 space-y-4">
+ <label className="flex items-center gap-3 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+ <input
+ type="checkbox"
+ checked={ldtEnabled}
+ onChange={(e) => setLdtEnabled(e.target.checked)}
+ className="w-5 h-5 rounded border-gray-300 text-[#008085] focus:ring-[#008085]"
+ />
+ <div>
+ <span className="text-[14px] font-medium text-near-black">Enable LDT Export</span>
+ <p className="text-[12px] text-gray-500">This laboratory will appear in LDT export options</p>
+ </div>
+ </label>
+ {ldtEnabled && (
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
  <div className="space-y-1.5">
  <label className="text-[13px] font-medium text-gray-700">Einsender ID</label>
  <input name="einsender_id" value={ldtConfig.einsender_id} onChange={handleLdtChange} className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors placeholder:text-gray-400" />
+ </div>
+ <div className="space-y-1.5">
+ <label className="text-[13px] font-medium text-gray-700">Customer Number (FK 8312)</label>
+ <input name="customer_number" value={ldtConfig.customer_number} onChange={handleLdtChange} className="w-full h-11 px-4 text-[14px] rounded-full border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors placeholder:text-gray-400" placeholder="e.g. 25997" />
  </div>
  <div className="space-y-1.5">
  <label className="text-[13px] font-medium text-gray-700">Charset</label>
@@ -254,21 +449,32 @@ export default function LaboratoryModal({ lab, onClose, onSuccess }: LaboratoryM
  </div>
  )}
  </div>
+ )}
+ </div>
 
  {/* PAD Config */}
  <div className="border border-gray-200 rounded-[12px] overflow-hidden">
  <button type="button" onClick={() => setShowPad(!showPad)} className="w-full flex items-center justify-between p-4 bg-gray-50/50 hover:bg-gray-100/50 transition-colors text-left">
- <span className="font-medium text-[14px] text-near-black">PAD Configuration (JSON)</span>
+ <div className="flex items-center gap-3">
+ <span className="font-medium text-[14px] text-near-black">PAD Configuration</span>
+ {padEnabled && <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Enabled</span>}
+ </div>
  {showPad ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
  </button>
  {showPad && (
  <div className="p-4 border-t border-gray-200">
- <textarea 
- value={padConfigStr} 
- onChange={e => setPadConfigStr(e.target.value)}
- className="w-full min-h-[120px] p-4 text-[13px] font-mono rounded-[8px] border border-gray-200 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
- placeholder="{}"
+ <label className="flex items-center gap-3 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+ <input
+ type="checkbox"
+ checked={padEnabled}
+ onChange={(e) => setPadEnabled(e.target.checked)}
+ className="w-5 h-5 rounded border-gray-300 text-[#008085] focus:ring-[#008085]"
  />
+ <div>
+ <span className="text-[14px] font-medium text-near-black">Enable PAD Export</span>
+ <p className="text-[12px] text-gray-500">This laboratory will appear in PAD XML export options</p>
+ </div>
+ </label>
  </div>
  )}
  </div>

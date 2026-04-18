@@ -109,7 +109,12 @@ export default function LaboratoriesPage() {
  {laboratories.map((lab) => (
  <tr key={lab.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => { setEditingLab(lab); setIsModalOpen(true); }}>
  <td className="px-6 py-4">
- <div className="font-semibold text-near-black">{lab.name}</div>
+ <div className="flex items-center gap-2">
+ <span className="font-semibold text-near-black">{lab.name}</span>
+ {lab.is_private && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Private</span>}
+ {lab.ldt_config?.enabled && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">LDT</span>}
+ {lab.pad_config?.enabled && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700">PAD</span>}
+ </div>
  {lab.official_name && <div className="text-[13px] text-gray-500">{lab.official_name}</div>}
  </td>
  <td className="px-6 py-4 text-gray-600">{lab.address_city || '-'}</td>
@@ -156,7 +161,12 @@ export default function LaboratoriesPage() {
  className={`p-4 hover:bg-gray-50/50 active:bg-gray-50 transition-colors ${index !== laboratories.length - 1 ? 'border-b border-gray-100' : ''}`}
  >
  <div className="flex items-start justify-between gap-3 mb-1">
- <div className="font-semibold text-near-black text-[15px]">{lab.name}</div>
+ <div className="flex items-center gap-2 flex-wrap">
+ <span className="font-semibold text-near-black text-[15px]">{lab.name}</span>
+ {lab.is_private && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Private</span>}
+ {lab.ldt_config?.enabled && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">LDT</span>}
+ {lab.pad_config?.enabled && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700">PAD</span>}
+ </div>
  <StatusBadge status={lab.is_active ? 'active' : 'inactive'} />
  </div>
  <div className="text-[13px] text-gray-500 mb-3 space-y-0.5">

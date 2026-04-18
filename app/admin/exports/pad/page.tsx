@@ -23,7 +23,11 @@ export default function PadExportPage() {
     async function fetchLabs() {
       try {
         const res = await fetch('/api/admin/laboratories');
-        if (res.ok) setLaboratories(await res.json());
+        if (res.ok) {
+          const allLabs = await res.json();
+          // Only show labs with PAD export enabled
+          setLaboratories(allLabs.filter((l: any) => l.pad_config?.enabled === true));
+        }
       } catch (e) {}
     }
     fetchLabs();
@@ -114,7 +118,7 @@ export default function PadExportPage() {
               className={`${selectClasses} w-full`}
               style={selectStyle}
             >
-              <option value="all">All Laboratories</option>
+              <option value="all">All PAD-enabled Laboratories</option>
               {laboratories.map((l: any) => (
                 <option key={l.id} value={l.id}>{l.name}</option>
               ))}

@@ -73,30 +73,45 @@ export async function PUT(request: Request, context: any) {
 }
 
 export async function DELETE(request: Request, context: any) {
- const { params } = context;
- try {
- const supabaseClient = createServerSupabaseClient();
- const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+  const { params } = context;
+  try {
+    const supabaseClient = createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
 
- if (authError || !user || user.user_metadata?.role !== 'admin') {
- return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
- }
+    if (authError || !user || user.user_metadata?.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
- const supabaseAdmin = createClient(
- process.env.NEXT_PUBLIC_SUPABASE_URL!,
- process.env.SUPABASE_SERVICE_ROLE_KEY!
- );
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
- const { data, error } = await supabaseAdmin
- .from('tt_material')
- .update({ is_active: false })
- .eq('id', params.id)
- .select()
- .single();
+    const { searchParams } = new URL(request.url);
+    const permanent = searchParams.get('permanent') === 'true';
 
- if (error) throw error;
- return NextResponse.json({ success: true });
- } catch (error: any) {
- return NextResponse.json({ error: error.message }, { status: 500 });
- }
+    if (permanent) {
+      // Real delete — will fail if FK constraints exist (e.g. linked in tt_test_catalog materials JSONB)
+      const { error } = await supabaseAdmin
+        .from('tt_material')
+        .delete()
+        .eq('id', params.id);
+
+      if (error) throw error;
+      return NextResponse.json({ success: true, action: 'deleted' });
+    } else {
+      // Soft-deactivate (backward compatible)
+      const { data, error } = await supabaseAdmin
+        .from('tt_material')
+        .update({ is_active: false })
+        .eq('id', params.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return NextResponse.json({ success: true, action: 'deactivated' });
+    }
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
