@@ -553,6 +553,7 @@ export async function assembleLdtItems(
       tt_laboratory (
         id,
         name,
+        customer_number,
         ldt_config
       )
     `)
@@ -578,7 +579,10 @@ export async function assembleLdtItems(
   for (const item of recItems) {
     const lab = item.tt_laboratory as any;
     if (lab?.ldt_config?.einsender_id) {
-      labConfig = lab.ldt_config as LdtConfig;
+      labConfig = {
+        ...lab.ldt_config,
+        customer_number: lab.ldt_config.customer_number || lab.customer_number?.replace(/\D/g, '') || '',
+      } as LdtConfig;
       labId = lab.id;
       labName = lab.name;
       break;
