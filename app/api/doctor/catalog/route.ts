@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       accessiblePrivateLabIds = (doctorLabs || []).map((dl: any) => dl.laboratory_id);
     }
 
-    // Get all private lab IDs (to exclude tests from private labs doctor doesn't have access to)
+    // Get all private lab IDs
     const { data: privateLabs } = await supabaseAdmin
       .from('tt_laboratory')
       .select('id')
@@ -61,8 +61,6 @@ export async function GET(request: Request) {
 
     // Exclude tests from private labs the doctor can't access
     if (excludedLabIds.length > 0) {
-      // Supabase doesn't have a clean "not in" for multiple values with .not().in()
-      // Use .not('lab_id', 'in', `(${ids})`) syntax
       query = query.not('lab_id', 'in', `(${excludedLabIds.join(',')})`);
     }
 

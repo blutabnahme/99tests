@@ -581,7 +581,6 @@ export async function assembleLdtItems(
     if (lab?.ldt_config?.einsender_id) {
       labConfig = {
         ...lab.ldt_config,
-        // Fallback: if customer_number not in ldt_config, use the table column
         customer_number: lab.ldt_config.customer_number || lab.customer_number?.replace(/\D/g, '') || '',
       } as LdtConfig;
       labId = lab.id;

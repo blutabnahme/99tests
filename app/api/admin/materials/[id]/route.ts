@@ -77,7 +77,6 @@ export async function DELETE(request: Request, context: any) {
   try {
     const supabaseClient = createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-
     if (authError || !user || user.user_metadata?.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -91,23 +90,11 @@ export async function DELETE(request: Request, context: any) {
     const permanent = searchParams.get('permanent') === 'true';
 
     if (permanent) {
-      // Real delete — will fail if FK constraints exist (e.g. linked in tt_test_catalog materials JSONB)
-      const { error } = await supabaseAdmin
-        .from('tt_material')
-        .delete()
-        .eq('id', params.id);
-
+      const { error } = await supabaseAdmin.from('tt_material').delete().eq('id', params.id);
       if (error) throw error;
       return NextResponse.json({ success: true, action: 'deleted' });
     } else {
-      // Soft-deactivate (backward compatible)
-      const { data, error } = await supabaseAdmin
-        .from('tt_material')
-        .update({ is_active: false })
-        .eq('id', params.id)
-        .select()
-        .single();
-
+      const { data, error } = await supabaseAdmin.from('tt_material').update({ is_active: false }).eq('id', params.id).select().single();
       if (error) throw error;
       return NextResponse.json({ success: true, action: 'deactivated' });
     }

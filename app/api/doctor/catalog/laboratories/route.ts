@@ -49,7 +49,7 @@ export async function GET() {
       return accessiblePrivateLabIds.includes(lab.id);
     });
 
-    // Return without is_private field (doctor doesn't need to know)
+    // Return without is_private field
     return NextResponse.json(visibleLabs.map(({ id, name }: any) => ({ id, name })));
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
