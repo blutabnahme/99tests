@@ -19,7 +19,7 @@ export default function CatalogPage() {
  // Pagination & Filters
  const [page, setPage] = useState(1);
  const [total, setTotal] = useState(0);
- const limit = 50;
+ const [limit, setLimit] = useState(50);
  
  const [search, setSearch] = useState('');
  const [type, setType] = useState('all');
@@ -50,17 +50,7 @@ export default function CatalogPage() {
  setLoading(true);
  setError('');
  try {
- const params = new URLSearchParams({
- page: page.toString(),
- limit: limit.toString(),
- active_only: activeOnly.toString()
- });
- if (search) params.append('search', search);
- if (type !== 'all') params.append('type', type);
- if (category !== 'all') params.append('category', category);
- if (labId !== 'all') params.append('lab_id', labId);
-
- const res = await fetch(`/api/admin/catalog?page=${page}&limit=${limit}&type=${type}&category=${encodeURIComponent(category)}&search=${encodeURIComponent(search)}&active_only=${activeOnly}`);
+ const res = await fetch(`/api/admin/catalog?page=${page}&limit=${limit}&type=${type}&search=${encodeURIComponent(search)}&lab_id=${labId !== 'all' ? labId : ''}&active_only=${activeOnly}`);
  if (!res.ok) throw new Error('Failed to fetch tests');
  const data = await res.json();
  
@@ -71,7 +61,7 @@ export default function CatalogPage() {
  } finally {
  setLoading(false);
  }
- }, [page, search, type, category, labId, activeOnly]);
+ }, [page, search, type, category, labId, activeOnly, limit]);
 
  useEffect(() => {
  fetchFiltersData();
@@ -98,7 +88,6 @@ export default function CatalogPage() {
 
  const handleExport = () => {
  const params = new URLSearchParams();
- if (category !== 'all') params.append('category', category);
  if (labId !== 'all') params.append('lab_id', labId);
  window.location.href = `/api/admin/catalog/export?${params.toString()}`;
  };
@@ -114,7 +103,7 @@ export default function CatalogPage() {
  Test Catalog
  </h1>
  <p className="text-gray-500 text-[14px] mt-1">
- {total} items · {categories.length} categories · {laboratories.filter(l => l.is_active).length} laboratories
+ {total} tests · {laboratories.filter((l: any) => l.is_active).length} laboratories
  </p>
  </div>
  <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
@@ -209,35 +198,33 @@ export default function CatalogPage() {
  <table className="w-full text-left text-[14px] whitespace-nowrap">
  <thead className="bg-gray-50/50 text-gray-500 font-medium text-[12px] uppercase tracking-wider">
  <tr>
- <th className="px-6 py-4">SKU</th>
- <th className="px-6 py-4">Name</th>
- <th className="px-6 py-4">Type</th>
- <th className="px-6 py-4">Category</th>
- <th className="px-6 py-4">Laboratory</th>
- <th className="px-6 py-4">Price</th>
- <th className="px-6 py-4">Status</th>
- <th className="px-6 py-4 text-right">Actions</th>
+ <th className="px-4 py-4 w-[130px]">SKU</th>
+ <th className="px-4 py-4">Name</th>
+ <th className="px-4 py-4 w-[100px]">Type</th>
+ <th className="px-4 py-4 w-[150px]">Laboratory</th>
+ <th className="px-4 py-4 w-[90px]">Price</th>
+ <th className="px-4 py-4 w-[70px]">Status</th>
+ <th className="px-4 py-4 w-[90px] text-right">Actions</th>
  </tr>
  </thead>
  <tbody className="divide-y divide-gray-100 font-body">
  {tests.map((test) => (
  <tr key={test.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => { setEditingTest(test); setIsTestModalOpen(true); }}>
- <td className="px-6 py-4 text-gray-500 font-mono text-[13px]">{test.sku}</td>
- <td className="px-6 py-4 font-semibold text-near-black max-w-[250px] truncate" title={test.name}>{test.name}</td>
- <td className="px-6 py-4">
- <span className={`px-2 py-1 rounded-full text-[10px] font-bold tracking-wider ${test.type === 'profile' ? 'bg-blue-50 text-blue-600' : 'bg-primary/10 text-primary'}`}>
+ <td className="px-4 py-4 text-gray-500 font-mono text-[12px]">{test.sku}</td>
+ <td className="px-4 py-4 font-semibold text-near-black truncate" title={test.name}>{test.name}</td>
+ <td className="px-4 py-4">
+ <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium tracking-wider ${test.type === 'profile' ? 'bg-blue-50 text-blue-600' : 'bg-primary/10 text-primary'}`}>
  {test.type.toUpperCase()}
  </span>
  </td>
- <td className="px-6 py-4 text-gray-600 truncate max-w-[150px]">{test.category || '-'}</td>
- <td className="px-6 py-4 text-gray-600 truncate max-w-[150px]">{test.lab?.name || '-'}</td>
- <td className="px-6 py-4 text-gray-600">
+ <td className="px-4 py-4 text-gray-600 truncate">{test.lab?.name || '-'}</td>
+ <td className="px-4 py-4 text-gray-600">
  {test.price_insured !== null ? `€${Number(test.price_insured).toFixed(2)}` : '-'}
  </td>
- <td className="px-6 py-4">
+ <td className="px-4 py-4">
  <div className={`w-2.5 h-2.5 rounded-full ${test.is_active ? 'bg-green-500' : 'bg-gray-300'}`} title={test.is_active ? 'Active' : 'Inactive'} />
  </td>
- <td className="px-6 py-4">
+ <td className="px-4 py-4">
  <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
  <button 
  onClick={() => { setEditingTest(test); setIsTestModalOpen(true); }}
@@ -258,7 +245,7 @@ export default function CatalogPage() {
  ))}
  {tests.length === 0 && (
  <tr>
- <td colSpan={8} className="px-6 py-12 text-center text-gray-500 bg-gray-50/50">
+ <td colSpan={7} className="px-6 py-12 text-center text-gray-500 bg-gray-50/50">
  No tests found
  </td>
  </tr>
@@ -286,7 +273,6 @@ export default function CatalogPage() {
  <span className="text-[12px] text-gray-500 font-mono">{test.sku}</span>
  </div>
  <div className="flex flex-wrap gap-2 text-[12px] text-gray-500 items-center">
- {test.category && <span className="bg-gray-100 px-2 py-1 rounded-md">{test.category}</span>}
  {test.lab?.name && <span className="bg-gray-100 px-2 py-1 rounded-md max-w-[150px] truncate">{test.lab.name}</span>}
  {test.price_insured && <span className="font-medium text-gray-700 ml-auto pt-1">€{Number(test.price_insured).toFixed(2)}</span>}
  </div>
@@ -301,29 +287,70 @@ export default function CatalogPage() {
  </div>
  )}
 
- {/* Pagination Container */}
+ {/* Pagination */}
  {!loading && totalPages > 1 && (
- <div className="flex items-center justify-between">
- <div className="text-[13px] text-gray-500">
- Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total} results
+ <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+ <div className="flex items-center gap-3">
+ <span className="text-[13px] text-gray-500">
+ Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
+ </span>
+ <select
+ value={limit}
+ onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
+ className="h-8 pl-2 pr-7 text-[12px] rounded-full border border-gray-200 focus:border-[#008085] focus:ring-1 focus:ring-[#008085] outline-none bg-white appearance-none"
+ style={{ backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2214%22%20height%3D%2214%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22%239CA3AF%22%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M5.293%207.293a1%201%200%20011.414%200L10%2010.586l3.293-3.293a1%201%200%20111.414%201.414l-4%204a1%201%200%2001-1.414%200l-4-4a1%201%200%20010-1.414z%22%20clip-rule%3D%22evenodd%22%20%2F%3E%3C%2Fsvg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 6px center', backgroundSize: '14px 14px' }}
+ >
+ <option value={25}>25 / page</option>
+ <option value={50}>50 / page</option>
+ <option value={100}>100 / page</option>
+ </select>
  </div>
- <div className="flex items-center gap-2">
- <Button
- variant="secondary"
+ <div className="flex items-center gap-1">
+ <button
  disabled={page === 1}
  onClick={() => setPage(page - 1)}
- className="text-[13px] h-9 px-4 rounded-full"
+ className="h-9 w-9 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[13px]"
  >
- Previous
- </Button>
- <Button
- variant="secondary"
+ ‹
+ </button>
+ {(() => {
+ const pages: (number | '...')[] = [];
+ if (totalPages <= 7) {
+ for (let i = 1; i <= totalPages; i++) pages.push(i);
+ } else {
+ pages.push(1);
+ if (page > 3) pages.push('...');
+ for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+ pages.push(i);
+ }
+ if (page < totalPages - 2) pages.push('...');
+ pages.push(totalPages);
+ }
+ return pages.map((p, idx) =>
+ p === '...' ? (
+ <span key={`ellipsis-${idx}`} className="h-9 w-6 flex items-center justify-center text-gray-400 text-[13px]">…</span>
+ ) : (
+ <button
+ key={p}
+ onClick={() => setPage(p as number)}
+ className={`h-9 min-w-[36px] px-2 flex items-center justify-center rounded-full text-[13px] font-medium transition-colors ${
+ p === page
+ ? 'bg-[#008085] text-white'
+ : 'border border-gray-200 text-gray-600 hover:border-gray-300'
+ }`}
+ >
+ {p}
+ </button>
+ )
+ );
+ })()}
+ <button
  disabled={page === totalPages}
  onClick={() => setPage(page + 1)}
- className="text-[13px] h-9 px-4 rounded-full"
+ className="h-9 w-9 flex items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-[13px]"
  >
- Next
- </Button>
+ ›
+ </button>
  </div>
  </div>
  )}
