@@ -207,14 +207,14 @@ function RecActionsDropdown({ rec, onActionComplete }: { rec: any; onActionCompl
   );
 }
 
-function SortableHeader({ label, sortKey, currentSort, onSort }: {
-  label: string; sortKey: string; currentSort: string; onSort: (key: string) => void;
+function SortableHeader({ label, sortKey, currentSort, onSort, className }: {
+  label: string; sortKey: string; currentSort: string; onSort: (key: string) => void; className?: string;
 }) {
   const isAsc = currentSort === `${sortKey}_asc`;
   const isDesc = currentSort === `${sortKey}_desc`;
   const handleClick = () => { if (isAsc) onSort(`${sortKey}_desc`); else onSort(`${sortKey}_asc`); };
   return (
-    <th className="px-6 py-4 cursor-pointer select-none hover:text-near-black transition-colors group" onClick={handleClick}>
+    <th className={`px-4 py-4 cursor-pointer select-none hover:text-near-black transition-colors group ${className || ''}`} onClick={handleClick}>
       <div className="flex items-center gap-1">
         <span>{label}</span>
         <span className="inline-flex flex-col text-[8px] leading-[8px]">
@@ -386,35 +386,35 @@ export default function AdminRecommendationsPage() {
             <table className="w-full text-left text-[14px] whitespace-nowrap">
               <thead className="bg-gray-50/50 text-gray-500 font-medium text-[12px] uppercase tracking-wider">
                 <tr>
-                  <SortableHeader label="ID" sortKey="id" currentSort={columnSort} onSort={setColumnSort} />
-                  <SortableHeader label="Patient" sortKey="patient" currentSort={columnSort} onSort={setColumnSort} />
-                  <SortableHeader label="Doctor" sortKey="doctor" currentSort={columnSort} onSort={setColumnSort} />
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Lab(s)</th>
-                  <SortableHeader label="Total" sortKey="total" currentSort={columnSort} onSort={setColumnSort} />
-                  <SortableHeader label="Date" sortKey="date" currentSort={columnSort} onSort={setColumnSort} />
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <SortableHeader label="ID" sortKey="id" currentSort={columnSort} onSort={setColumnSort} className="w-[100px]" />
+                  <SortableHeader label="Patient" sortKey="patient" currentSort={columnSort} onSort={setColumnSort} className="w-[170px]" />
+                  <SortableHeader label="Doctor" sortKey="doctor" currentSort={columnSort} onSort={setColumnSort} className="w-[160px]" />
+                  <th className="px-4 py-4 w-[100px]">Status</th>
+                  <th className="px-4 py-4">Lab(s)</th>
+                  <SortableHeader label="Total" sortKey="total" currentSort={columnSort} onSort={setColumnSort} className="w-[90px]" />
+                  <SortableHeader label="Date" sortKey="date" currentSort={columnSort} onSort={setColumnSort} className="w-[140px]" />
+                  <th className="px-4 py-4 w-[70px] text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-body">
                 {sortedRecommendations.map((rec) => (
                   <tr key={rec.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/recommendations/${rec.id}`}>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-[13px] text-primary font-semibold">{rec.display_id || rec.id?.substring(0, 8)}</span>
                         <span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">{rec.item_count}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <div className="font-semibold text-near-black">{rec.patient?.first_name} {rec.patient?.last_name}</div>
                       <div className="text-[12px] text-gray-500">{rec.patient?.email}</div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{rec.doctor?.full_name || '-'}</td>
-                    <td className="px-6 py-4"><StatusBadge status={rec.status || 'created'} /></td>
-                    <td className="px-6 py-4 text-gray-600 text-[13px] truncate max-w-[180px]">{(rec.labs || []).join(', ') || '-'}</td>
-                    <td className="px-6 py-4 font-mono text-gray-900 font-medium">{rec.test_total > 0 ? formatCurrency(rec.test_total) : '-'}</td>
-                    <td className="px-6 py-4 text-gray-500 text-[13px]">{formatDate(rec.created_at)}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 text-gray-600">{rec.doctor?.full_name || '-'}</td>
+                    <td className="px-4 py-4"><StatusBadge status={rec.status || 'created'} /></td>
+                    <td className="px-4 py-4 text-gray-600 text-[13px] truncate max-w-[180px]">{(rec.labs || []).join(', ') || '-'}</td>
+                    <td className="px-4 py-4 font-mono text-gray-900 font-medium">{rec.test_total > 0 ? formatCurrency(rec.test_total) : '-'}</td>
+                    <td className="px-4 py-4 text-gray-500 text-[13px]">{formatDate(rec.created_at)}</td>
+                    <td className="px-4 py-4">
                       <div className="flex items-center justify-end" onClick={e => e.stopPropagation()}>
                         <RecActionsDropdown rec={rec} onActionComplete={() => fetchRecommendations()} />
                       </div>

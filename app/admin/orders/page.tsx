@@ -112,14 +112,14 @@ function DoctorSearchSelect({ doctors, value, onChange }: { doctors: any[]; valu
   );
 }
 
-function SortableHeader({ label, sortKey, currentSort, onSort }: {
-  label: string; sortKey: string; currentSort: string; onSort: (key: string) => void;
+function SortableHeader({ label, sortKey, currentSort, onSort, className }: {
+  label: string; sortKey: string; currentSort: string; onSort: (key: string) => void; className?: string;
 }) {
   const isAsc = currentSort === `${sortKey}_asc`;
   const isDesc = currentSort === `${sortKey}_desc`;
   const handleClick = () => { if (isAsc) onSort(`${sortKey}_desc`); else onSort(`${sortKey}_asc`); };
   return (
-    <th className="px-6 py-4 cursor-pointer select-none hover:text-near-black transition-colors group" onClick={handleClick}>
+    <th className={`px-4 py-4 cursor-pointer select-none hover:text-near-black transition-colors group ${className || ''}`} onClick={handleClick}>
       <div className="flex items-center gap-1">
         <span>{label}</span>
         <span className="inline-flex flex-col text-[8px] leading-[8px]">
@@ -272,30 +272,30 @@ export default function OrdersPage() {
             <table className="w-full text-left text-[14px] whitespace-nowrap">
               <thead className="bg-gray-50/50 text-gray-500 font-medium text-[12px] uppercase tracking-wider">
                 <tr>
-                  <SortableHeader label="Order ID" sortKey="order" currentSort={columnSort} onSort={setColumnSort} />
-                  <SortableHeader label="Patient" sortKey="patient" currentSort={columnSort} onSort={setColumnSort} />
-                  <SortableHeader label="Doctor" sortKey="doctor" currentSort={columnSort} onSort={setColumnSort} />
-                  <SortableHeader label="Total" sortKey="total" currentSort={columnSort} onSort={setColumnSort} />
-                  <th className="px-6 py-4">Payment</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Pipeline</th>
-                  <SortableHeader label="Date" sortKey="date" currentSort={columnSort} onSort={setColumnSort} />
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <SortableHeader label="Order ID" sortKey="order" currentSort={columnSort} onSort={setColumnSort} className="w-[110px]" />
+                  <SortableHeader label="Patient" sortKey="patient" currentSort={columnSort} onSort={setColumnSort} className="w-[160px]" />
+                  <SortableHeader label="Doctor" sortKey="doctor" currentSort={columnSort} onSort={setColumnSort} className="w-[150px]" />
+                  <SortableHeader label="Total" sortKey="total" currentSort={columnSort} onSort={setColumnSort} className="w-[90px]" />
+                  <th className="px-4 py-4 w-[120px]">Payment</th>
+                  <th className="px-4 py-4 w-[110px]">Status</th>
+                  <th className="px-4 py-4 w-[100px]">Pipeline</th>
+                  <SortableHeader label="Date" sortKey="date" currentSort={columnSort} onSort={setColumnSort} className="w-[110px]" />
+                  <th className="px-4 py-4 w-[70px] text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-body">
                 {sortedOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <Link href={`/admin/orders/${order.id}`} className="font-mono text-[13px] text-primary hover:underline font-semibold">
                         {order.display_id || order.id?.substring(0, 8)}
                       </Link>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <div className="font-semibold text-near-black">{order.patient?.first_name} {order.patient?.last_name}</div>
                       <div className="text-[12px] text-gray-500">{order.patient?.email}</div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600 text-[13px]">
+                    <td className="px-4 py-4 text-gray-600 text-[13px]">
                       <span className="group relative cursor-default">
                         <span>
                           {(() => {
@@ -318,16 +318,16 @@ export default function OrdersPage() {
                         </span>
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-mono text-gray-900">
+                    <td className="px-4 py-4 font-mono text-gray-900">
                       {order.total != null ? `€${Number(order.total).toFixed(2)}` : '-'}
                     </td>
-                    <td className="px-6 py-4 text-gray-600 text-[13px]">
+                    <td className="px-4 py-4 text-gray-600 text-[13px]">
                       {formatPaymentMethod(order.payment_method)}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <StatusBadge status={order.status || 'preparing'} />
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <div className="flex items-center gap-1.5">
                         <PipelineDotsIndicator status={order.preparation_status} />
                         {order.resend_count > 0 && (
@@ -335,10 +335,10 @@ export default function OrdersPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-500 text-[13px]">
+                    <td className="px-4 py-4 text-gray-500 text-[13px]">
                       {formatDate(order.created_at)}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4">
                       <div className="flex items-center justify-end">
                         <Link
                           href={`/admin/orders/${order.id}`}

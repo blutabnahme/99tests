@@ -8,6 +8,27 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import TestCatalogModal from '@/components/admin/TestCatalogModal';
 import ImportTestsModal from '@/components/admin/ImportTestsModal';
 
+const bulkBarKeyframes = `@keyframes bulkBarIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }`;
+
+function SortableHeader({ label, sortKey, currentSort, onSort, className = '' }: {
+  label: string; sortKey: string; currentSort: string; onSort: (key: string) => void; className?: string;
+}) {
+  const isAsc = currentSort === `${sortKey}_asc`;
+  const isDesc = currentSort === `${sortKey}_desc`;
+  const handleClick = () => { if (isAsc) onSort(`${sortKey}_desc`); else onSort(`${sortKey}_asc`); };
+  return (
+    <th className={`px-4 py-4 cursor-pointer select-none hover:text-near-black transition-colors group ${className}`} onClick={handleClick}>
+      <div className="flex items-center gap-1">
+        <span>{label}</span>
+        <span className="inline-flex flex-col text-[8px] leading-[8px]">
+          <span className={isAsc ? 'text-[#008085]' : 'text-gray-300 group-hover:text-gray-400'}>▲</span>
+          <span className={isDesc ? 'text-[#008085]' : 'text-gray-300 group-hover:text-gray-400'}>▼</span>
+        </span>
+      </div>
+    </th>
+  );
+}
+
 export default function CatalogPage() {
  const [tests, setTests] = useState<any[]>([]);
  const [loading, setLoading] = useState(true);
@@ -23,6 +44,9 @@ export default function CatalogPage() {
  
  const [search, setSearch] = useState('');
  const [type, setType] = useState('all');
+ const [columnSort, setColumnSort] = useState('name_asc');
+ const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+ const [bulkLoading, setBulkLoading] = useState(false);
  const [category, setCategory] = useState('all');
  const [labId, setLabId] = useState('all');
  const [activeOnly, setActiveOnly] = useState(true);
@@ -50,7 +74,7 @@ export default function CatalogPage() {
  setLoading(true);
  setError('');
  try {
- const res = await fetch(`/api/admin/catalog?page=${page}&limit=${limit}&type=${type}&search=${encodeURIComponent(search)}&lab_id=${labId !== 'all' ? labId : ''}&active_only=${activeOnly}`);
+ const res = await fetch(`/api/admin/catalog?page=${page}&limit=${limit}&type=${type}&search=${encodeURIComponent(search)}&lab_id=${labId !== 'all' ? labId : ''}&active_only=${activeOnly}&sort=${columnSort}`);
  if (!res.ok) throw new Error('Failed to fetch tests');
  const data = await res.json();
  
@@ -61,7 +85,10 @@ export default function CatalogPage() {
  } finally {
  setLoading(false);
  }
- }, [page, search, type, category, labId, activeOnly, limit]);
+ }, [page, search, type, category, labId, activeOnly, limit, columnSort]);
+
+ // Clear selection on filter/page/sort change
+ useEffect(() => { setSelectedIds(new Set()); }, [page, search, type, category, labId, activeOnly, columnSort]);
 
  useEffect(() => {
  fetchFiltersData();
@@ -93,6 +120,35 @@ export default function CatalogPage() {
  };
 
  const totalPages = Math.ceil(total / limit);
+
+ // Selection helpers
+ const allPageSelected = tests.length > 0 && tests.every((t: any) => selectedIds.has(t.id));
+ const someSelected = selectedIds.size > 0;
+ const toggleSelectAll = () => {
+   if (allPageSelected) setSelectedIds(new Set());
+   else setSelectedIds(new Set(tests.map((t: any) => t.id)));
+ };
+ const toggleSelect = (id: string) => {
+   setSelectedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+ };
+
+ const handleSortChange = (newSort: string) => {
+   setColumnSort(newSort);
+   setPage(1);
+ };
+
+ const handleBulkToggle = async (activate: boolean) => {
+   setBulkLoading(true);
+   const ids = Array.from(selectedIds);
+   try {
+     for (const id of ids) {
+       await fetch(`/api/admin/catalog/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: activate }) });
+     }
+     setSelectedIds(new Set());
+     fetchTests();
+   } catch (err) { console.error(err); }
+   finally { setBulkLoading(false); }
+ };
 
  return (
  <div className="max-w-7xl mx-auto space-y-6 lg:space-y-8">
@@ -180,6 +236,18 @@ export default function CatalogPage() {
  </label>
  </div>
 
+ {/* Bulk Action Bar */}
+ {someSelected && (
+   <div className="flex items-center gap-3 bg-[#E6F7F5]/50 border border-[#008085]/20 rounded-[12px] px-4 py-3" style={{ animation: 'bulkBarIn 0.2s ease-out' }}>
+     <style>{bulkBarKeyframes}</style>
+     <span className="text-[14px] font-medium text-[#005C5F] whitespace-nowrap">{selectedIds.size} selected</span>
+     <div className="flex-1" />
+     <button className="inline-flex items-center justify-center rounded-full text-[13px] h-9 px-4 font-medium bg-white border border-gray-200 text-gray-700 hover:border-[#008085] hover:text-[#008085] disabled:opacity-50 transition-colors" onClick={() => handleBulkToggle(true)} disabled={bulkLoading}>Activate</button>
+     <button className="inline-flex items-center justify-center rounded-full text-[13px] h-9 px-4 font-medium bg-white border border-gray-200 text-gray-700 hover:border-[#008085] hover:text-[#008085] disabled:opacity-50 transition-colors" onClick={() => handleBulkToggle(false)} disabled={bulkLoading}>Deactivate</button>
+     <button onClick={() => setSelectedIds(new Set())} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full"><X className="w-4 h-4" /></button>
+   </div>
+ )}
+
  {/* Content */}
  {error && (
  <div className="p-4 bg-red-50 text-red-600 rounded-[16px] text-sm font-medium border border-red-100">
@@ -198,18 +266,20 @@ export default function CatalogPage() {
  <table className="w-full text-left text-[14px] whitespace-nowrap">
  <thead className="bg-gray-50/50 text-gray-500 font-medium text-[12px] uppercase tracking-wider">
  <tr>
- <th className="px-4 py-4 w-[130px]">SKU</th>
- <th className="px-4 py-4">Name</th>
- <th className="px-4 py-4 w-[100px]">Type</th>
+ <th className="px-3 py-4 w-12"><input type="checkbox" checked={allPageSelected && tests.length > 0} onChange={toggleSelectAll} className="w-4 h-4 rounded border-gray-300 text-[#008085] focus:ring-[#008085]" /></th>
+ <SortableHeader label="SKU" sortKey="sku" currentSort={columnSort} onSort={handleSortChange} className="w-[120px]" />
+ <SortableHeader label="Name" sortKey="name" currentSort={columnSort} onSort={handleSortChange} />
+ <SortableHeader label="Type" sortKey="type" currentSort={columnSort} onSort={handleSortChange} className="w-[100px]" />
  <th className="px-4 py-4 w-[150px]">Laboratory</th>
- <th className="px-4 py-4 w-[90px]">Price</th>
- <th className="px-4 py-4 w-[70px]">Status</th>
+ <SortableHeader label="Price" sortKey="price" currentSort={columnSort} onSort={handleSortChange} className="w-[90px]" />
+ <th className="px-4 py-4 w-[60px]">Status</th>
  <th className="px-4 py-4 w-[90px] text-right">Actions</th>
  </tr>
  </thead>
  <tbody className="divide-y divide-gray-100 font-body">
  {tests.map((test) => (
- <tr key={test.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => { setEditingTest(test); setIsTestModalOpen(true); }}>
+ <tr key={test.id} className={`transition-colors cursor-pointer ${selectedIds.has(test.id) ? 'bg-[#E6F7F5]/30' : 'hover:bg-gray-50/50'}`} onClick={() => { setEditingTest(test); setIsTestModalOpen(true); }}>
+ <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.has(test.id)} onChange={() => toggleSelect(test.id)} className="w-4 h-4 rounded border-gray-300 text-[#008085] focus:ring-[#008085]" /></td>
  <td className="px-4 py-4 text-gray-500 font-mono text-[12px]">{test.sku}</td>
  <td className="px-4 py-4 font-semibold text-near-black truncate" title={test.name}>{test.name}</td>
  <td className="px-4 py-4">
@@ -245,7 +315,7 @@ export default function CatalogPage() {
  ))}
  {tests.length === 0 && (
  <tr>
- <td colSpan={7} className="px-6 py-12 text-center text-gray-500 bg-gray-50/50">
+ <td colSpan={8} className="px-6 py-12 text-center text-gray-500 bg-gray-50/50">
  No tests found
  </td>
  </tr>

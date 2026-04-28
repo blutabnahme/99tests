@@ -411,33 +411,13 @@ async function main() {
       goae_names: goaeNames,
       goae_factor: goaeFactor,
       goae_costs: goaeCosts,
-      // Store additional fields in a metadata-like approach using existing columns where possible
-      // included_parameters and anamnese_parameters → profile_components JSONB (we'll use included_parameters text for now)
-      // method, sample, anamnese_type_biovis, test_kit → stored in preanalytics or as extended JSONB
+      // Extra columns (added via migration 025)
+      method,
+      anamnese_type: anamneseTypeBiovis,
+      test_kit: testKit,
+      included_parameters_text: includedParameters,
+      anamnese_parameters: anamneseParameters,
     };
-
-    // For profile components, store as text in included_parameters column
-    // We'll handle the profile_components JSONB column in a migration later
-    // For now, store included_parameters and anamnese_parameters as part of name_translations or a separate field
-    // Actually, let's store these in the existing columns where we can:
-
-    // Build extended metadata that goes beyond the current schema
-    const extendedData: Record<string, any> = {};
-    if (includedParameters) extendedData.included_parameters_text = includedParameters;
-    if (anamneseParameters) extendedData.anamnese_parameters = anamneseParameters;
-    if (method) extendedData.method = method;
-    if (sample) extendedData.sample = sample;
-    if (anamneseTypeBiovis) extendedData.anamnese_type_biovis = anamneseTypeBiovis;
-    if (testKit) extendedData.test_kit = testKit;
-
-    // Store extended data in name_translations as additional keys
-    // This is a pragmatic choice — we keep the schema clean and add a migration for proper columns later
-    if (Object.keys(extendedData).length > 0) {
-      (dbRow as any).name_translations = {
-        ...dbRow.name_translations,
-        _meta: extendedData,
-      };
-    }
 
     validRows.push(dbRow);
 

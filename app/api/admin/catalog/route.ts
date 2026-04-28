@@ -20,6 +20,7 @@ export async function GET(request: Request) {
  const lab_id = searchParams.get('lab_id');
  const search = searchParams.get('search');
  const active_only = searchParams.get('active_only') !== 'false'; // default true
+ const sort = searchParams.get('sort') || 'name_asc';
 
  const supabaseAdmin = createClient(
  process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,7 +48,19 @@ export async function GET(request: Request) {
  const from = (page - 1) * limit;
  const to = from + limit - 1;
 
- const { data, count, error } = await query.order('name', { ascending: true }).range(from, to);
+ // Apply sorting
+ const sortMap: Record<string, { column: string; ascending: boolean }> = {
+   'name_asc': { column: 'name', ascending: true },
+   'name_desc': { column: 'name', ascending: false },
+   'sku_asc': { column: 'sku', ascending: true },
+   'sku_desc': { column: 'sku', ascending: false },
+   'type_asc': { column: 'type', ascending: true },
+   'type_desc': { column: 'type', ascending: false },
+   'price_asc': { column: 'price_insured', ascending: true },
+   'price_desc': { column: 'price_insured', ascending: false },
+ };
+ const sortConfig = sortMap[sort] || sortMap['name_asc'];
+ const { data, count, error } = await query.order(sortConfig.column, { ascending: sortConfig.ascending }).range(from, to);
 
  if (error) throw error;
 

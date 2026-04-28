@@ -171,7 +171,19 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
   }, [pathname]);
 
   const toggleGroup = (id: string) => {
-    setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+    setCollapsed(prev => {
+      const isCurrentlyOpen = !prev[id];
+      if (isCurrentlyOpen) {
+        // Closing — just close it
+        return { ...prev, [id]: true };
+      } else {
+        // Opening — close all others, open this one
+        const allClosed: Record<string, boolean> = {};
+        Object.keys(prev).forEach(key => { allClosed[key] = true; });
+        allClosed[id] = false;
+        return allClosed;
+      }
+    });
   };
 
   // ============================================================
@@ -255,11 +267,17 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
         </button>
 
         {/* Children */}
-        {isOpen && (
+        <div
+          className="overflow-hidden transition-all duration-200 ease-in-out"
+          style={{
+            maxHeight: isOpen ? `${group.children.length * 44}px` : '0px',
+            opacity: isOpen ? 1 : 0,
+          }}
+        >
           <div className="mt-0.5 space-y-0.5">
             {group.children.map(child => renderItem(child, true))}
           </div>
-        )}
+        </div>
       </div>
     );
   };

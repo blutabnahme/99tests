@@ -44,6 +44,26 @@ export async function GET(request: Request) {
     // Labs to exclude: private labs the doctor does NOT have access to
     const excludedLabIds = allPrivateLabIds.filter(id => !accessiblePrivateLabIds.includes(id));
 
+    // Get private test IDs this doctor has access to
+    let accessiblePrivateTestIds: string[] = [];
+    if (doctor) {
+      const { data: doctorTests } = await supabaseAdmin
+        .from('tt_doctor_test')
+        .select('test_id')
+        .eq('doctor_id', doctor.id);
+      accessiblePrivateTestIds = (doctorTests || []).map((dt: any) => dt.test_id);
+    }
+
+    // Get all private test IDs
+    const { data: privateTests } = await supabaseAdmin
+      .from('tt_test_catalog')
+      .select('id')
+      .eq('is_private', true);
+    const allPrivateTestIds = (privateTests || []).map((t: any) => t.id);
+
+    // Tests to exclude: private tests the doctor does NOT have access to
+    const excludedTestIds = allPrivateTestIds.filter((id: string) => !accessiblePrivateTestIds.includes(id));
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '25');
@@ -62,6 +82,11 @@ export async function GET(request: Request) {
     // Exclude tests from private labs the doctor can't access
     if (excludedLabIds.length > 0) {
       query = query.not('lab_id', 'in', `(${excludedLabIds.join(',')})`);
+    }
+
+    // Exclude private tests the doctor can't access
+    if (excludedTestIds.length > 0) {
+      query = query.not('id', 'in', `(${excludedTestIds.join(',')})`);
     }
 
     if (sort === 'newest') {

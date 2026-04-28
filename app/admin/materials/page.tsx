@@ -11,6 +11,25 @@ import MaterialModal from '@/components/admin/MaterialModal';
 
 const bulkBarKeyframes = `@keyframes bulkBarIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }`;
 
+function SortableHeader({ label, sortKey, currentSort, onSort, className = '' }: {
+  label: string; sortKey: string; currentSort: string; onSort: (key: string) => void; className?: string;
+}) {
+  const isAsc = currentSort === `${sortKey}_asc`;
+  const isDesc = currentSort === `${sortKey}_desc`;
+  const handleClick = () => { if (isAsc) onSort(`${sortKey}_desc`); else onSort(`${sortKey}_asc`); };
+  return (
+    <th className={`px-4 py-4 cursor-pointer select-none hover:text-near-black transition-colors group ${className}`} onClick={handleClick}>
+      <div className="flex items-center gap-1">
+        <span>{label}</span>
+        <span className="inline-flex flex-col text-[8px] leading-[8px]">
+          <span className={isAsc ? 'text-[#008085]' : 'text-gray-300 group-hover:text-gray-400'}>▲</span>
+          <span className={isDesc ? 'text-[#008085]' : 'text-gray-300 group-hover:text-gray-400'}>▼</span>
+        </span>
+      </div>
+    </th>
+  );
+}
+
 // ─── Confirmation Modal ───────────────────────────────────────
 function ConfirmDeleteModal({
   count, onConfirm, onCancel, loading
@@ -68,6 +87,7 @@ export default function MaterialsPage() {
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [columnSort, setColumnSort] = useState('name_asc');
 
   // Delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<{ ids: string[] } | null>(null);
@@ -105,7 +125,7 @@ export default function MaterialsPage() {
   }, [materials]);
 
   const filteredMaterials = useMemo(() => {
-    return materials.filter((mat) => {
+    const filtered = materials.filter((mat) => {
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         if (!mat.code?.toLowerCase().includes(q) && !mat.name?.toLowerCase().includes(q)) return false;
@@ -114,7 +134,22 @@ export default function MaterialsPage() {
       if (measurementFilter !== 'all' && mat.measurement_type !== measurementFilter) return false;
       return true;
     });
-  }, [materials, searchQuery, tubeTypeFilter, measurementFilter]);
+
+    // Sort
+    const sorted = [...filtered];
+    sorted.sort((a, b) => {
+      if (columnSort === 'code_asc') return (a.code || '').localeCompare(b.code || '');
+      if (columnSort === 'code_desc') return (b.code || '').localeCompare(a.code || '');
+      if (columnSort === 'name_asc') return (a.name || '').localeCompare(b.name || '');
+      if (columnSort === 'name_desc') return (b.name || '').localeCompare(a.name || '');
+      if (columnSort === 'tube_type_asc') return (a.tube_type || '').localeCompare(b.tube_type || '');
+      if (columnSort === 'tube_type_desc') return (b.tube_type || '').localeCompare(a.tube_type || '');
+      if (columnSort === 'measurement_asc') return (a.measurement_type || '').localeCompare(b.measurement_type || '');
+      if (columnSort === 'measurement_desc') return (b.measurement_type || '').localeCompare(a.measurement_type || '');
+      return 0;
+    });
+    return sorted;
+  }, [materials, searchQuery, tubeTypeFilter, measurementFilter, columnSort]);
 
   const allFilteredSelected = filteredMaterials.length > 0 && filteredMaterials.every((m) => selectedIds.has(m.id));
   const someSelected = selectedIds.size > 0;
@@ -255,13 +290,13 @@ export default function MaterialsPage() {
               <thead className="bg-gray-50/50 text-gray-500 font-medium text-[12px] uppercase tracking-wider">
                 <tr>
                   <th className="px-4 py-4 w-12"><input type="checkbox" checked={allFilteredSelected && filteredMaterials.length > 0} onChange={toggleSelectAll} className="w-4 h-4 rounded border-gray-300 text-[#008085] focus:ring-[#008085]" /></th>
-                  <th className="px-4 py-4">Code</th>
-                  <th className="px-4 py-4">Name</th>
-                  <th className="px-4 py-4">Tube Type</th>
-                  <th className="px-4 py-4">Tube Color</th>
-                  <th className="px-4 py-4">Measurement</th>
-                  <th className="px-4 py-4">Status</th>
-                  <th className="px-4 py-4 text-right">Actions</th>
+                  <SortableHeader label="Code" sortKey="code" currentSort={columnSort} onSort={setColumnSort} className="w-[80px]" />
+                  <SortableHeader label="Name" sortKey="name" currentSort={columnSort} onSort={setColumnSort} />
+                  <SortableHeader label="Tube Type" sortKey="tube_type" currentSort={columnSort} onSort={setColumnSort} className="w-[110px]" />
+                  <th className="px-4 py-4 w-[110px]">Tube Color</th>
+                  <SortableHeader label="Measurement" sortKey="measurement" currentSort={columnSort} onSort={setColumnSort} className="w-[130px]" />
+                  <th className="px-4 py-4 w-[60px]">Status</th>
+                  <th className="px-4 py-4 w-[100px] text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-body">
@@ -275,7 +310,9 @@ export default function MaterialsPage() {
                       <td className="px-4 py-4 text-gray-600">{mat.tube_type || '-'}</td>
                       <td className="px-4 py-4"><div className="flex items-center gap-2"><TubeColorDot color={mat.tube_color} /><span className="text-gray-600 capitalize">{mat.tube_color || '-'}</span></div></td>
                       <td className="px-4 py-4 text-gray-600">{mat.measurement_type === 'volume' ? (<span>{mat.default_volume ? `${mat.default_volume} ${mat.default_unit || 'ml'} capacity` : 'Volume-based'}</span>) : (<span className="text-gray-400">Quantity-based</span>)}</td>
-                      <td className="px-4 py-4"><StatusBadge status={mat.is_active ? 'active' : 'inactive'} /></td>
+                      <td className="px-4 py-4">
+                        <div className={`w-2.5 h-2.5 rounded-full ${mat.is_active ? 'bg-green-500' : 'bg-gray-300'}`} title={mat.is_active ? 'Active' : 'Inactive'} />
+                      </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <button onClick={() => { setEditingMaterial(mat); setIsModalOpen(true); }} className="p-2 text-gray-400 hover:text-[#008085] hover:bg-[#008085]/5 rounded-full transition-colors" title="Edit"><Edit2 className="w-4 h-4" /></button>
@@ -308,7 +345,7 @@ export default function MaterialsPage() {
                     <div className="flex-1 min-w-0" onClick={() => { setEditingMaterial(mat); setIsModalOpen(true); }}>
                       <div className="flex items-start justify-between gap-3 mb-1">
                         <div className="font-semibold text-near-black text-[15px]">{mat.name}</div>
-                        <StatusBadge status={mat.is_active ? 'active' : 'inactive'} />
+                        <div className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1.5 ${mat.is_active ? 'bg-green-500' : 'bg-gray-300'}`} title={mat.is_active ? 'Active' : 'Inactive'} />
                       </div>
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-[12px] text-gray-500 font-mono px-2 py-0.5 bg-gray-100 rounded-md">{mat.code}</span>
